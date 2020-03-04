@@ -503,8 +503,7 @@ def intersect_over_union(bbox1, bbox2):
 
 
 def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indices, source_names,metadata,
-        gt_data,gt_locs,
-        label_dir="label_debug_im_hull"):
+        gt_data,gt_locs):
     """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
     components so that they can be inspected to improve the box-draw-process"""
     # Make dir to collect the failed images in
@@ -535,6 +534,9 @@ def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indi
     #[copyfile(src, dest) for src, dest in zip(image_source_paths, image_dest_paths)]
     image_only=False
     scale=2
+    scale_factor=1.5151515151515151
+    imsize=200
+    final_imsize=imsize*scale
     if image_only:
 
         for src, dest in zip(image_source_paths, image_dest_paths):
@@ -543,8 +545,14 @@ def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indi
                     copyfileobj(fin, fout, 128*1024)
     else:
 
-        plt.close("all")
         (locs, focus_locs, close_comp_locs) = gt_locs
+        (locs, focus_locs, close_comp_locs) = (np.array(locs)[fail_indices], np.array(focus_locs)[fail_indices],
+            np.array(close_comp_locs)[fail_indices])
+        print('locs,flocs, closecomplocs')
+        print(locs[0])
+        print(focus_locs[0])
+        print(close_comp_locs[0])
+        plt.close()
 
         for pred,gt, l, focus_l, close_l, src, dest in zip(np.array(predictions)[fail_indices],gt_data[fail_indices],
                 locs, focus_locs, close_comp_locs, image_source_paths, image_dest_paths):
@@ -576,10 +584,26 @@ def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indi
 
             # Plot figure 
             f, (ax1, ax2) = plt.subplots(1,2, figsize=(15,10))
+            # Radio intensity + ground truth bboxes
             ax1.imshow(v_gt)
             ax1.set_title('Ground truth labels')
+            # Radio intensity + predicted bboxes
             ax2.imshow(v_pred)
             ax2.set_title('Predicted labels')
+            # Component locations
+            s = scale*scale_factor
+            # Filter out unassociated close components outside of cutout
+            close_l = np.array([[x,y] for x,y in zip(close_l[0],close_l[1]) if (0 <= x < 200) and (0 <= y < 200)]).T
+            #print(close_l)
+
+            if not l.size == 0:
+                ax1.plot(l[0]*s,final_imsize-l[1]*s,'ro')
+                ax2.plot(l[0]*s,final_imsize-l[1]*s,'ro')
+            ax1.plot(focus_l[0]*s,final_imsize-focus_l[1]*s,'rs')
+            ax2.plot(focus_l[0]*s,final_imsize-focus_l[1]*s,'rs')
+            if not close_l.size == 0:
+                ax1.plot(close_l[0]*s,final_imsize-close_l[1]*s,color='orange', marker='o', linestyle='None')
+                ax2.plot(close_l[0]*s,final_imsize-close_l[1]*s,color='orange', marker='o', linestyle='None')
             #plt.show()
             plt.savefig(dest, bbox_inches='tight')
             plt.close()
