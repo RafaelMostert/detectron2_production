@@ -545,6 +545,9 @@ def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indi
                     copyfileobj(fin, fout, 128*1024)
     else:
 
+        assert not gt_data is None, ("The class LOFAREvaluator needs to be given input for the kwarg",
+            "gt_data, or else manually set the flag image_only in the function collect_misboxed to False")
+
         (locs, focus_locs, close_comp_locs) = gt_locs
         (locs, focus_locs, close_comp_locs) = (np.array(locs)[fail_indices], np.array(focus_locs)[fail_indices],
             np.array(close_comp_locs)[fail_indices])
@@ -553,6 +556,9 @@ def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indi
         print(focus_locs[0])
         print(close_comp_locs[0])
         plt.close()
+        print("shape predictions and gt data")
+        print(np.shape(predictions), np.shape(gt_data))
+        print(fail_indices)
 
         for pred,gt, l, focus_l, close_l, src, dest in zip(np.array(predictions)[fail_indices],gt_data[fail_indices],
                 locs, focus_locs, close_comp_locs, image_source_paths, image_dest_paths):

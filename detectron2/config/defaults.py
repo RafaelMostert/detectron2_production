@@ -561,6 +561,10 @@ _C.TEST.PRECISE_BN.NUM_ITER = 200
 # ---------------------------------------------------------------------------- #
 # Directory where output files are written
 _C.OUTPUT_DIR = "./output"
+# Name of the experiment
+_C.EXPERIMENT_NAME = ""
+# Path to the data
+_C.DATASET_PATH = ""
 # Set seed to negative to fully randomize everything.
 # Set seed to positive to use a fixed seed. Note that a fixed seed does not
 # guarantee fully deterministic behavior.
