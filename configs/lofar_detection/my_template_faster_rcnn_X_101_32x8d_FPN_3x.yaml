@@ -15,9 +15,13 @@ INPUT:
   SCALE_FACTOR: 1.5151515151515151 #1.0 #4.545454545454546
   MIN_SIZE_TRAIN: (200,)
   MIN_SIZE_TEST: 200
-  MAX_SIZE_TRAIN: 200
-  MAX_SIZE_TEST: 200
+  MAX_SIZE_TRAIN: 201
+  MAX_SIZE_TEST: 201
 MODEL:
+    # Proposal height and width both need to be greater than MIN_SIZE
+    # (a the scale used during training or inference)
+  PROPOSAL_GENERATOR:
+    MIN_SIZE: 4 
   MASK_ON: False
   WEIGHTS: "detectron2://ImageNetPretrained/FAIR/X-101-32x8d.pkl"
   # Determine mean of our GBR channels
@@ -40,5 +44,5 @@ MODEL:
 SOLVER:
   BASE_LR: 0.0003
   IMS_PER_BATCH: 2
-  STEPS: (210000, 250000)
+  STEPS: (30000, 50000)
   MAX_ITER: 60000

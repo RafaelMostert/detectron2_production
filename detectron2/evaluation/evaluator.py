@@ -122,7 +122,8 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
     
     predictions_save_path = path.join(evaluator._output_dir,
             f'predictions_{evaluator._dataset_name}.pkl')
-    if not overwrite:
+    print(predictions_save_path)
+    if not overwrite and path.exists(predictions_save_path):
         # Load existing predictions if overwrite is false
         evaluator._predictions = load_obj(predictions_save_path)
     else:

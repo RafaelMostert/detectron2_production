@@ -63,7 +63,7 @@ class LOFAREvaluator(DatasetEvaluator):
 
     """
 
-    def __init__(self, dataset_name, cfg,distributed, imsize,
+    def __init__(self, dataset_name, cfg,distributed, 
             overwrite=False, gt_data=None ):
         """
         Args:
@@ -90,7 +90,7 @@ class LOFAREvaluator(DatasetEvaluator):
         self._image_dir = cfg.DATASETS.IMAGE_DIR
         self._fits_path = cfg.DATASETS.FITS_PATH
         self._scale_factor = cfg.INPUT.SCALE_FACTOR
-        self._imsize = imsize
+        self._imsize = 200 #cfg.INPUT.MAX_SIZE_TRAIN
 
         self._cpu_device = torch.device("cpu")
         self._logger = logging.getLogger(__name__)
@@ -375,16 +375,19 @@ def load_obj(file_path):
         return pickle.load(input)
         
 def _get_component_and_neighbouring_pixel_locations(output_dir, source_names, fits_paths, component_cat_path,
-                        search_radius_arcsec=200, overwrite=True, save_appendix=''):
+                        search_radius_arcsec=200, overwrite=False, save_appendix=''):
     """Return pixel locations of the components associated with source_names
     and pixel locations of the sources within search_radius."""
+    print(source_names[:10])
     
     comp_pixel_locs_save_path = f'{output_dir}/save_comp_pixel_locs_{save_appendix}.pkl'
     focus_pixel_locs_save_path = f'{output_dir}/save_focus_pixel_locs_{save_appendix}.pkl'
     close_comp_pixel_locs_save_path = f'{output_dir}/save_close_comp_pixel_locs_{save_appendix}.pkl'
+    overwrite = False
     if overwrite or not os.path.exists(comp_pixel_locs_save_path) or \
             not os.path.exists(focus_pixel_locs_save_path) or \
             not os.path.exists(close_comp_pixel_locs_save_path):
+        print("entering the timeconsuming part")
         # Load source cat
         # Load source comp cat
         comp_cat = pd.read_hdf(component_cat_path.replace('.fits','.h5'),'df')
@@ -397,6 +400,7 @@ def _get_component_and_neighbouring_pixel_locations(output_dir, source_names, fi
         # pickle this result because it is resource intensive
         comp_save_path = f'{output_dir}/save_comp_{save_appendix}.pkl'
         if overwrite or not os.path.exists(comp_save_path):
+            print("entering the super timeconsuming part")
             component_names = [comp_cat[comp_cat.Source_Name == comp_name_to_source_name_dict[source_name]]
                            for source_name in source_names]
             save_obj(comp_save_path, component_names)
@@ -503,7 +507,7 @@ def intersect_over_union(bbox1, bbox2):
 
 
 def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indices, source_names,metadata,
-        gt_data,gt_locs):
+        gt_data,gt_locs, imsize):
     """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
     components so that they can be inspected to improve the box-draw-process"""
     # Make dir to collect the failed images in
@@ -535,9 +539,9 @@ def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indi
     image_only=False
     scale=2
     scale_factor=1.5151515151515151
-    imsize=200
     final_imsize=imsize*scale
-    if image_only:
+    (locs, focus_locs, close_comp_locs) = gt_locs
+    if image_only or np.shape(locs)[0]==0:
 
         for src, dest in zip(image_source_paths, image_dest_paths):
             with open(src, 'rb') as fin:
@@ -548,10 +552,10 @@ def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indi
         assert not gt_data is None, ("The class LOFAREvaluator needs to be given input for the kwarg",
             "gt_data, or else manually set the flag image_only in the function collect_misboxed to False")
 
-        (locs, focus_locs, close_comp_locs) = gt_locs
         (locs, focus_locs, close_comp_locs) = (np.array(locs)[fail_indices], np.array(focus_locs)[fail_indices],
             np.array(close_comp_locs)[fail_indices])
         print('locs,flocs, closecomplocs')
+        print(np.shape(locs))
         print(locs[0])
         print(focus_locs[0])
         print(close_comp_locs[0])
@@ -616,7 +620,7 @@ def collect_misboxed(predictions,image_dir, output_dir, fail_dir_name, fail_indi
 
 
 def _check_if_pred_central_bbox_misses_comp(pred, image_dir,output_dir, 
-        source_names, n_comps,comp_scores, metadata,gt_data,gt_locs, summary_only=False):
+        source_names, n_comps,comp_scores, metadata,gt_data,gt_locs, summary_only=False, debug=False):
     """Check whether the predicted central box misses a number of assocatiated components
         as indicated by the ground truth"""
 
@@ -634,14 +638,16 @@ def _check_if_pred_central_bbox_misses_comp(pred, image_dir,output_dir,
     ran = list(range(len(comp_scores)))
     fail_indices = [i for i, n_comp, total in zip(ran, n_comps, comp_scores) 
             if ((n_comp == 1) and (n_comp != total)) ]
-    collect_misboxed(pred, image_dir, output_dir, "assoc_single_fail_fraction", fail_indices,
-            source_names,metadata,gt_data,gt_locs)
+    if debug:
+        collect_misboxed(pred, image_dir, output_dir, "assoc_single_fail_fraction", fail_indices,
+            source_names,metadata,gt_data,gt_locs, imsize)
 
     # Collect single comp sources that fail to include their gt comp
     fail_indices = [i for i, n_comp, total in zip(ran, n_comps, comp_scores) 
             if ((n_comp > 1) and (n_comp != total)) ]
-    collect_misboxed(pred, image_dir,output_dir, "assoc_multi_fail_fraction", fail_indices,
-            source_names,metadata,gt_data,gt_locs)
+    if debug:
+        collect_misboxed(pred, image_dir,output_dir, "assoc_multi_fail_fraction", fail_indices,
+            source_names,metadata,gt_data,gt_locs, imsize)
 
     if not summary_only:
         print(f'{len(single_comp_success)-np.sum(single_comp_success)} single comp predictions'
@@ -683,7 +689,7 @@ def _check_if_pred_central_bbox_misses_comp_old(n_comps,comp_scores, summary_onl
         
 def _check_if_pred_central_bbox_includes_unassociated_comps(pred, image_dir,output_dir, source_names, 
         n_comps,close_comp_scores, metadata,gt_data,gt_locs,
-                                                            summary_only=False):
+                                                            summary_only=False, debug=False):
     """Check whether the predicted central box includes a number of unassocatiated components
         as indicated by the ground truth"""
     # Tally for single comp
@@ -709,13 +715,15 @@ def _check_if_pred_central_bbox_includes_unassociated_comps(pred, image_dir,outp
     ran = list(range(len(close_comp_scores)))
     fail_indices = [i for i, n_comp, total in zip(ran, n_comps, close_comp_scores) 
             if ((n_comp == 1) and (0 != total)) ]
-    collect_misboxed(pred, image_dir, output_dir, "unassoc_single_fail_fraction", fail_indices,
+    if debug:
+        collect_misboxed(pred, image_dir, output_dir, "unassoc_single_fail_fraction", fail_indices,
             source_names,metadata,gt_data,gt_locs)
 
     # Collect single comp sources that fail to include their gt comp
     fail_indices = [i for i, n_comp, total in zip(ran, n_comps, close_comp_scores) 
             if ((n_comp > 1) and (0 != total)) ]
-    collect_misboxed(pred, image_dir, output_dir, "unassoc_multi_fail_fraction", fail_indices,
+    if debug:
+        collect_misboxed(pred, image_dir, output_dir, "unassoc_multi_fail_fraction", fail_indices,
             source_names,metadata,gt_data,gt_locs)
     if not summary_only:
         print(f'{len(single_comp_success)-np.sum(single_comp_success)} single comp predictions'
@@ -766,7 +774,7 @@ def _check_if_pred_central_bbox_includes_unassociated_comps_old(n_comps,close_co
     return 1-single_comp_success_frac, 1-multi_comp_binary_success_frac
 
     
-def _get_gt_bboxes(lofar_gt, focus_locs, close_comp_locs, save_appendix=None, overwrite=False):
+def _get_gt_bboxes(lofar_gt, focus_locs, close_comp_locs, imsize, save_appendix=None, overwrite=False):
     """Get ground truth bounding boxes"""
     central_bboxes_save_path = f'cache/save_central_bboxes_{save_appendix}.pkl'
 
@@ -877,7 +885,7 @@ def _evaluate_predictions_on_lofar_score(dataset_name, predictions, imsize, outp
     #return pred_central_bboxes_scores
     # Return IoU with ground truth
     if not summary_only:
-        central_bboxes = _get_gt_bboxes(lofar_gt, focus_locs, close_comp_locs, 
+        central_bboxes = _get_gt_bboxes(lofar_gt, focus_locs, close_comp_locs,imsize, 
                                         save_appendix=save_appendix, overwrite=overwrite)
 
         iou_pred_central_bboxes = [intersect_over_union(bbox,bbox_score[0])
@@ -889,7 +897,8 @@ def _evaluate_predictions_on_lofar_score(dataset_name, predictions, imsize, outp
     #print([loc for loc in locs])
     #print([[x,y for x,y in np.dstack(loc)[0]] for loc in locs])
     # TODO yaxis flip hack
-    comp_scores = [np.sum([is_within(x*scale_factor,imsize-y*scale_factor, bbox[0],bbox[1],bbox[2],bbox[3]) 
+    comp_scores = [np.sum([is_within(x*scale_factor,imsize-y*scale_factor,
+        bbox[0],bbox[1],bbox[2],bbox[3]) 
                     for x,y in list(zip(loc[0],loc[1]))])
                                       for loc, (bbox, score) in zip(locs, pred_central_bboxes_scores)]
     #nana = [(scale_factor*x, scale_factor*y) for x, y in np.dstack(locs[inspect_id])[0]]
@@ -906,7 +915,8 @@ def _evaluate_predictions_on_lofar_score(dataset_name, predictions, imsize, outp
     print('len comp_scores ',len(comp_scores))
     print('len close comp, pred bbox',len(close_comp_locs),  len(pred_central_bboxes_scores))
     assert len(close_comp_locs) == len(pred_central_bboxes_scores)
-    close_comp_scores = [np.sum([is_within(x*scale_factor,imsize-y*scale_factor, bbox[0],bbox[1],bbox[2],bbox[3]) 
+    close_comp_scores = [np.sum([is_within(x*scale_factor,imsize-y*scale_factor,
+        bbox[0],bbox[1],bbox[2],bbox[3]) 
                 for x,y in zip(xs,ys)])
                         for (xs,ys), (bbox, score) in zip(close_comp_locs, pred_central_bboxes_scores)]
     includes_unassociated_fail_fraction =  _check_if_pred_central_bbox_includes_unassociated_comps(
