@@ -148,7 +148,7 @@ val_loader = build_detection_test_loader(cfg, f"val")
 my_dataset = get_lofar_dicts(os.path.join(DATASET_PATH,f"VIA_json_val.pkl"))
 
 imsize = cfg.INPUT.MAX_SIZE_TRAIN
-evaluator = LOFAREvaluator(f"val", cfg, False,imsize, gt_data=my_dataset, overwrite=False)
+evaluator = LOFAREvaluator(f"val", cfg, False,gt_data=my_dataset, overwrite=False)
             
 # Val_loader produces inputs that can enter the model for inference, 
 # the results of which can be evaluated by the evaluator
@@ -206,7 +206,7 @@ val_score_dict = predictions['bbox']
 single, multi = 818,367
 single, multi = 861, 329
 baseline = baseline(single, multi)
-our_score = our_score(single, multi,test_score_dict)
+our_score = our_score(single, multi,val_score_dict)
 improv(baseline, our_score)
 
 
