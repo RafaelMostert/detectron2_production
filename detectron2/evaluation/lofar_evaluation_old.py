@@ -383,7 +383,7 @@ def _get_component_and_neighbouring_pixel_locations(output_dir, source_names, fi
     comp_pixel_locs_save_path = f'{output_dir}/save_comp_pixel_locs_{save_appendix}.pkl'
     focus_pixel_locs_save_path = f'{output_dir}/save_focus_pixel_locs_{save_appendix}.pkl'
     close_comp_pixel_locs_save_path = f'{output_dir}/save_close_comp_pixel_locs_{save_appendix}.pkl'
-    overwrite = False
+    #overwrite = False
     if overwrite or not os.path.exists(comp_pixel_locs_save_path) or \
             not os.path.exists(focus_pixel_locs_save_path) or \
             not os.path.exists(close_comp_pixel_locs_save_path):
