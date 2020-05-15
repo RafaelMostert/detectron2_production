@@ -57,9 +57,14 @@ class LOFAREvaluator(DatasetEvaluator):
 
     def reset(self):
         self._predictions = []
+        self.focussed_comps = []
+        self.related_comps = []
+        self.unrelated_comps = []
+        self.n_comps = []
+        self.pred_bboxes_scores = []
 
     def process(self, inputs, outputs):
-
+        # Save ground truths and predicted bounding boxes to this class
         for input, output in zip(inputs, outputs):
             prediction = {"image_id": input["image_id"], "file_name":input["file_name"],
                     "focussed_comp":input["focussed_comp"],"related_comp":input["related_comp"],
@@ -69,25 +74,16 @@ class LOFAREvaluator(DatasetEvaluator):
                 instances = output["instances"].to(self._cpu_device)#.numpy()
                 prediction["instances"] = instances
             self._predictions.append(prediction)
-            """
-            #self._inputs.append(input)
-            panoptic_img, segments_info = output["panoptic_seg"]
-            panoptic_img = panoptic_img.cpu().numpy()
 
-            file_name = os.path.basename(input["file_name"])
-            file_name_png = os.path.splitext(file_name)[0] + ".png"
-            with io.BytesIO() as out:
-                Image.fromarray(id2rgb(panoptic_img)).save(out, format="PNG")
-                segments_info = [self._convert_category_id(x) for x in segments_info]
-                self._predictions.append(
-                    {
-                        "image_id": input["image_id"],
-                        "file_name": file_name_png,
-                        "png_string": out.getvalue(),
-                        "segments_info": segments_info,
-                    }
-                )
-            """
+        self.focussed_comps = [p["focussed_comp"] for p in self._predictions]
+        self.related_comps = [p["related_comp"] for p in self._predictions]
+        self.unrelated_comps = [p["unrelated_comp"] for p in self._predictions]
+        self.n_comps = [1+len(c[0]) for c in self.related_comps]
+        
+        # Get predicted bounding boxes per image as numpy arrays
+        self.pred_bboxes_scores = [(image_dict['instances'].get_fields()['pred_boxes'].tensor.numpy(), 
+                  image_dict['instances'].get_fields()['scores'].numpy()) 
+                 for image_dict in predictions]
 
     def evaluate(self):
         # for parallel execution 
@@ -114,12 +110,7 @@ class LOFAREvaluator(DatasetEvaluator):
 
 
         includes_associated_fail_fraction, includes_unassociated_fail_fraction, correct_cat = \
-            _evaluate_predictions_on_lofar_score(self._dataset_name, self._predictions,
-                    self._imsize, self._output_dir, save_appendix=self._dataset_name, scale_factor=self._scale_factor, 
-                                        overwrite=self._overwrite, summary_only=True,
-                                        comp_cat_path=self._component_cat_path,
-                                        fits_dir=self._fits_path, gt_data=self._gt_data,
-                                        image_dir=self._image_dir, metadata=self._metadata)
+            _evaluate_predictions_on_lofar_score()
 
         self._results = OrderedDict()
         self._results["bbox"] = {"assoc_single_fail_fraction": includes_associated_fail_fraction[0],
@@ -129,52 +120,12 @@ class LOFAREvaluator(DatasetEvaluator):
         "correct_catalogue": correct_cat}
         # Copy so the caller can do whatever with results
         return copy.deepcopy(self._results)
-        """
-        #gt_json = PathManager.get_local_path(self._metadata.panoptic_json)
-        #gt_folder = self._metadata.panoptic_root
-
-        with tempfile.TemporaryDirectory(prefix="panoptic_eval") as pred_dir:
-            logger.info("Writing all panoptic predictions to {} ...".format(pred_dir))
-            for p in self._predictions:
-                with open(os.path.join(pred_dir, p["file_name"]), "wb") as f:
-                    f.write(p.pop("png_string"))
-
-            with open(gt_json, "r") as f:
-                json_data = json.load(f)
-            json_data["annotations"] = self._predictions
-            with PathManager.open(self._predictions_json, "w") as f:
-                f.write(json.dumps(json_data))
-
-            from panopticapi.evaluation import pq_compute
-
-            with contextlib.redirect_stdout(io.StringIO()):
-                pq_res = pq_compute(
-                    gt_json,
-                    PathManager.get_local_path(self._predictions_json),
-                    gt_folder=gt_folder,
-                    pred_folder=pred_dir,
-                )
-
-        res = {}
-        res["PQ"] = 100 * pq_res["All"]["pq"]
-        res["SQ"] = 100 * pq_res["All"]["sq"]
-        res["RQ"] = 100 * pq_res["All"]["rq"]
-        res["PQ_th"] = 100 * pq_res["Things"]["pq"]
-        res["SQ_th"] = 100 * pq_res["Things"]["sq"]
-        res["RQ_th"] = 100 * pq_res["Things"]["rq"]
-        res["PQ_st"] = 100 * pq_res["Stuff"]["pq"]
-        res["SQ_st"] = 100 * pq_res["Stuff"]["sq"]
-        res["RQ_st"] = 100 * pq_res["Stuff"]["rq"]
-
-        results = OrderedDict({"panoptic_seg": res})
-        _print_panoptic_results(pq_res)
-        """
 
     def _evaluate_predictions_on_lofar_score(dataset_name, predictions, imsize, output_dir, 
                                         save_appendix='', scale_factor=1, 
                                         overwrite=True, summary_only=False,
                                         comp_cat_path=None, gt_data=None,
-                                        fits_dir=None, metadata=None):
+                                        fits_dir=None, metadata=None, debug=False):
         """ 
         Evaluate the results using our LOFAR appropriate score.
 
@@ -192,106 +143,138 @@ class LOFAREvaluator(DatasetEvaluator):
             5. The prediction score is lower than x
         
         """
-        predictions = self._predictions
-        debug=True
-        print("scale_factor", scale_factor)
-
-        ###################### ground truth
-        # Get pixel locations of ground truth components
-        """
-            prediction = {"image_id": input["image_id"], 
-            "file_name":input["file_name"], # string of path
-                    "focussed_comp":input["focussed_comp"], # single x,y tuple
-                    "related_comp":input["related_comp"], # list of xs and list of ys
-                    "unrelated_comp":input["unrelated_comp"]} # list of xs and list of ys
-        """
-        focussed_comps = [p["focussed_comp"] for p in predictions]
-        related_comps = [p["related_comp"] for p in predictions]
-        unrelated_comps = [p["unrelated_comp"] for p in predictions]
-        n_comps = [1+len(c[0]) for c in related_comps]
-
-        gt_locs = (focussed_comps, related_comps, unrelated_comps, n_comps)
         if debug:
+            #Check ground truth and prediction values of first item
+            print("scale_factor", scale_factor)
             print("ncomps", "locs, centrallocs, closecomplocs")
-            print(focussed_comps[0], related_comps[0], n_comps[0])
-
-
-        ###################### prediction
-        # Get bounding boxes per image as numpy arrays
-        pred_bboxes_scores = [(image_dict['instances'].get_fields()['pred_boxes'].tensor.numpy(), 
-                  image_dict['instances'].get_fields()['scores'].numpy()) 
-                 for image_dict in predictions]
-        if debug:
+            print(self.focussed_comps[0], self.related_comps[0], self.unrelated_comps, self.n_comps[0])
             print("pred_bboxes_scores")
-            print(pred_bboxes_scores[0])
+            print(self.pred_bboxes_scores[0])
 
-        # Filter out bounding box per image that covers the focussed pixel
+
+        # Filter out predicted bboxes that do not cover the focussed pixel
         pred_central_bboxes_scores = [[(tuple(bbox),score) for bbox, score in zip(bboxes, scores) 
                             if is_within(x*scale_factor,imsize-y*scale_factor, 
                                 bbox[0],bbox[1],bbox[2],bbox[3])] 
-                              for (x, y), (bboxes, scores) in zip(focussed_comps, pred_bboxes_scores)]
+                              for (x, y), (bboxes, scores) 
+                              in zip(self.focussed_comps, self.pred_bboxes_scores)]
         if debug:
             print("pred_bboxes_scores after filtering out the focussed pixel")
             print(pred_central_bboxes_scores[0])
         
-        # 1. No predicted box covers the middle pixel
-        # can now be checked
-        #     fail_fraction_1 = (len(central_bboxes)-len(pred_central_bboxes_scores))/len(central_bboxes)
-        #     print(f'{(len(central_bboxes)-len(pred_central_bboxes_scores))} predictions '
-        #           f'(or {fail_fraction_1:.1%}) fail to cover the central component of the source.')
-        
-        # Take only the highest scoring bbox from this list
+        # Take only the highest scoring bbox from this list of bboxes
         pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
                                       if len(bboxes_scores) > 0 else [[-1,-1,-1,-1],0] 
                                       for bboxes_scores in pred_central_bboxes_scores]
 
         # Check if other source comps fall inside predicted central box
-        #print([loc for loc in locs])
-        #print([[x,y for x,y in np.dstack(loc)[0]] for loc in locs])
-        # TODO yaxis flip hack
-        comp_scores = [np.sum([is_within(x*scale_factor,imsize-y*scale_factor,
+        # NOTE: y is flipped here in a hacky way
+        self.comp_scores = [np.sum([is_within(x*scale_factor,imsize-y*scale_factor,
             bbox[0],bbox[1],bbox[2],bbox[3]) 
                         for x,y in list(zip(comps[0],comps[1]))])
                                           for comps, (bbox, score) 
-                                          in zip(related_comps, pred_central_bboxes_scores)]
-        #nana = [(scale_factor*x, scale_factor*y) for x, y in np.dstack(locs[inspect_id])[0]]
-        #print("locs scaled", nana)
+                                          in zip(self.related_comps, pred_central_bboxes_scores)]
 
-        # 2. The predicted central box misses a number of components
-        # can now be checked
-        includes_associated_fail_fraction = _check_if_pred_central_bbox_misses_comp(predictions,
-                image_dir, output_dir,
-                source_names, n_comps,comp_scores, metadata,gt_data, gt_locs,
-                                                    summary_only=summary_only)
+        # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
+        includes_associated_fail_fraction = self.check_if_pred_central_bbox_misses_comp(debug=debug)
         
-        # 3. The predicted central box encompasses too many components
-        # can now be checked
+        # 3&4. "Predicted central bbox encompasses too many or too few components" can now be checked
         if debug:
-            print('len comp_scores ',len(comp_scores))
-            print('len close comp, pred bbox',len(close_comp_locs),  len(pred_central_bboxes_scores))
-        assert len(close_comp_locs) == len(pred_central_bboxes_scores)
-        close_comp_scores = [np.sum([is_within(x*scale_factor,imsize-y*scale_factor,
+            print('len comp_scores ',len(self.comp_scores))
+            print('len close comp, pred bbox',len(self.close_comp_locs),
+                    len(pred_central_bboxes_scores))
+        assert len(self.unrelated_comps) == len(pred_central_bboxes_scores)
+        # NOTE: y is flipped here in a hacky way
+        self.close_comp_scores = [np.sum([is_within(x*scale_factor,imsize-y*scale_factor,
             bbox[0],bbox[1],bbox[2],bbox[3]) 
                     for x,y in zip(xs,ys)])
-                            for (xs,ys), (bbox, score) in zip(close_comp_locs, pred_central_bboxes_scores)]
-        includes_unassociated_fail_fraction =  _check_if_pred_central_bbox_includes_unassociated_comps(
-                predictions, image_dir, output_dir, source_names, n_comps,close_comp_scores, metadata,
-                gt_data, gt_locs,
-                                                                summary_only=summary_only)
-        return includes_associated_fail_fraction, includes_unassociated_fail_fraction
+                            for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
+                                pred_central_bboxes_scores)]
+        includes_unassociated_fail_fraction = /
+            self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
+
+        return includes_associated_fail_fraction, includes_unassociated_fail_fraction, correct_cat
+
+    def baseline(single, multi):
+        total = single + multi
+        correct = single/total
+        print(f"Baseline assumption cat is {correct:.1%} correct")
+        return correct
+
+    def our_score(single, multi,score_dict, suffix=''):
+        fail_single = score_dict['assoc_single_fail_fraction']*single + score_dict['unassoc_single_fail_fraction']*single
+        fail_multi = score_dict['assoc_multi_fail_fraction']*multi + score_dict['unassoc_multi_fail_fraction']*multi
+        total = single + multi
+        correct = (total-(fail_single+fail_multi))/total
+        print(f"{suffix} cat is {correct:.1%} correct")
+        return correct
+
+    def improv(baseline, our_score):
+        print(f"{(our_score-baseline)/baseline:.2%} improvement")
 
 
-def _print_panoptic_results(pq_res):
-    #TODO
-    headers = ["", "PQ", "SQ", "RQ", "#categories"]
-    data = []
-    for name in ["All", "Things", "Stuff"]:
-        row = [name] + [pq_res[name][k] * 100 for k in ["pq", "sq", "rq"]] + [pq_res[name]["n"]]
-        data.append(row)
-    table = tabulate(
-        data, headers=headers, tablefmt="pipe", floatfmt=".3f", stralign="center", numalign="center"
-    )
-    logger.info("Panoptic Evaluation Results:\n" + table)
+        
+    def _check_if_pred_central_bbox_includes_unassociated_comps(debug=False):
+        """Check whether the predicted central box includes a number of unassocatiated components
+            as indicated by the ground truth"""
+        # Tally for single comp
+        single_comp_success = [total == 0 for n_comp, total in zip(self.n_comps, self.close_comp_scores) 
+                               if n_comp == 1]
+        single_comp_success_frac = np.sum(single_comp_success)/len(single_comp_success)
+            
+        # Tally for multi comp
+        multi_comp_binary_success = [total == 0 for n_comp, total in 
+                                     zip(self.n_comps, self.close_comp_scores) if n_comp > 1]
+        multi_comp_success = [total for n_comp, total in zip(self.n_comps, self.close_comp_scores) 
+                                    if n_comp > 1]
+        multi_comp_binary_success_frac = np.sum(multi_comp_binary_success)/len(multi_comp_binary_success)
+        
+        if debug:
+            # Collect single comp sources that includ unassociated comps
+            ran = list(range(len(self.close_comp_scores)))
+            fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.close_comp_scores) 
+                    if ((n_comp == 1) and (0 != total)) ]
+            collect_misboxed(pred, image_dir, output_dir, "unassoc_single_fail_fraction", fail_indices,
+                    source_names,metadata,gt_data,gt_locs)
+
+            # Collect single comp sources that fail to include their gt comp
+            fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.close_comp_scores) 
+                    if ((n_comp > 1) and (0 != total)) ]
+            collect_misboxed(pred, image_dir, output_dir, "unassoc_multi_fail_fraction", fail_indices,
+                    source_names,metadata,gt_data,gt_locs)
+        return 1-single_comp_success_frac, 1-multi_comp_binary_success_frac
+
+
+
+    def _check_if_pred_central_bbox_misses_comp(debug=False):
+        """Check whether the predicted central box misses a number of assocatiated components
+            as indicated by the ground truth"""
+
+        # Tally for single comp
+        single_comp_success = [n_comp == total for n_comp, total in zip(self.n_comps, self.comp_scores) if n_comp == 1]
+        single_comp_success_frac = np.sum(single_comp_success)/len(single_comp_success)
+            
+        # Tally for multi comp
+        multi_comp_binary_success = [n_comp == total for n_comp, total in 
+                                     zip(self.n_comps, self.comp_scores) if n_comp > 1]
+        multi_comp_binary_success_frac = np.sum(multi_comp_binary_success)/len(multi_comp_binary_success)
+        
+        if debug:
+            # Collect single comp sources that fail to include their gt comp
+            ran = list(range(len(self.comp_scores)))
+            fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.comp_scores) 
+                    if ((n_comp == 1) and (n_comp != total)) ]
+            collect_misboxed(pred, image_dir, output_dir, "assoc_single_fail_fraction", fail_indices,
+                    source_names,metadata,gt_data,gt_locs, imsize)
+
+            # Collect single comp sources that fail to include their gt comp
+            fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.comp_scores) 
+                    if ((n_comp > 1) and (n_comp != total)) ]
+            collect_misboxed(pred, image_dir,output_dir, "assoc_multi_fail_fraction", fail_indices,
+                    source_names,metadata,imsize)
+
+        return 1-single_comp_success_frac, 1-multi_comp_binary_success_frac
+    
 
 
 if __name__ == "__main__":
