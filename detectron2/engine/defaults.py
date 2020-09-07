@@ -359,7 +359,7 @@ class DefaultTrainer(SimpleTrainer):
 
         # Do evaluation after checkpointer, because then if it fails,
         # we can use the saved checkpoint to debug.
-        ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
+        ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results,cfg.TEST.EXTRA_EVAL))
 
         if comm.is_main_process():
             # run writers in the end, so that evaluation metrics are written
@@ -711,15 +711,15 @@ class LOFARTrainer(SimpleTrainer):
             ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD))
 
         def test_and_save_results():
-            imsize=200
             self._last_eval_results = self.test(self.cfg, self.model,
-                    evaluators=[LOFAREvaluator(self.cfg.DATASETS.TEST[0], self.cfg, False,
-                        imsize,cfg.OUTPUT_DIR)])
+                    evaluators=[LOFAREvaluator(t, cfg.OUTPUT_DIR)
+                        for t in self.cfg.DATASETS.TEST])
             return self._last_eval_results
 
         # Do evaluation after checkpointer, because then if it fails,
         # we can use the saved checkpoint to debug.
-        ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
+        ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results,
+            cfg.TEST.EXTRA_EVAL))
 
         if comm.is_main_process():
             # run writers in the end, so that evaluation metrics are written
@@ -850,11 +850,11 @@ class LOFARTrainer(SimpleTrainer):
             dict: a dict of result metrics
         """
         logger = logging.getLogger(__name__)
-        print(evaluators)
-        print(type(evaluators))
+        #print(evaluators)
+        #print(type(evaluators))
         if isinstance(evaluators, DatasetEvaluator):
             evaluators = [evaluators]
-        print(evaluators)
+        #print(evaluators)
         if evaluators is not None:
             assert len(cfg.DATASETS.TEST) == len(evaluators), "{} != {}".format(
                 len(cfg.DATASETS.TEST), len(evaluators)
