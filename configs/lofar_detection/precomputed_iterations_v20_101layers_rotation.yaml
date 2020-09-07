@@ -1,0 +1,24 @@
+_BASE_: "base_lofar_fast_rcnn.yaml"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/v20/"
+MODEL:
+  #WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+  WEIGHTS: "detectron2://ImageNetPretrained/FAIR/X-101-32x8d.pkl"
+  # Determine mean of our GBR channels
+  RESNETS:
+    STRIDE_IN_1X1: False  # this is a C2 model
+    NUM_GROUPS: 32
+    WIDTH_PER_GROUP: 8
+    DEPTH: 101
+DATASETS:
+  TEST: ("train","val","test")
+  TRAIN_SIZE: 9999999999999
+SOLVER:
+  #LR_SCHEDULER_NAME:  "WarmupCosineLR" 
+  STEPS: ()
+  MAX_ITER: 100000
+  CHECKPOINT_PERIOD: 30000
+TEST:
+  EVAL_PERIOD: 20000
+  EXTRA_EVAL: [10,100,500,1000,2500,5000,10000]
+INPUT:
+  ROTATION_ENABLED: True 
