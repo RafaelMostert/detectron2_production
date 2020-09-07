@@ -1,5 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-from .cityscapes_evaluation import CityscapesEvaluator
+from .cityscapes_evaluation import CityscapesInstanceEvaluator, CityscapesSemSegEvaluator
 from .coco_evaluation import COCOEvaluator
 from .lofar_evaluation import LOFAREvaluator
 from .rotated_coco_evaluation import RotatedCOCOEvaluator

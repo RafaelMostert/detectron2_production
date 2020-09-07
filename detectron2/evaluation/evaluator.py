@@ -8,7 +8,7 @@ import torch
 import pickle
 from os import path
 
-from detectron2.utils.comm import is_main_process
+from detectron2.utils.comm import get_world_size, is_main_process
 from detectron2.utils.logger import log_every_n_seconds
 
 
@@ -30,13 +30,20 @@ class DatasetEvaluator:
         """
         pass
 
-    def process(self, input, output):
+    def process(self, inputs, outputs):
         """
-        Process an input/output pair.
+        Process the pair of inputs and outputs.
+        If they contain batches, the pairs can be consumed one-by-one using `zip`:
+
+        .. code-block:: python
+
+            for input_, output in zip(inputs, outputs):
+                # do evaluation on single input/output pair
+                ...
 
         Args:
-            input: the input that's used to call the model.
-            output: the return value of `model(input)`
+            inputs (list): the inputs that's used to call the model.
+            outputs (list): the return value of `model(inputs)`
         """
         pass
 
@@ -57,8 +64,18 @@ class DatasetEvaluator:
 
 
 class DatasetEvaluators(DatasetEvaluator):
+    """
+    Wrapper class to combine multiple :class:`DatasetEvaluator` instances.
+
+    This class dispatches every evaluation call to
+    all of its :class:`DatasetEvaluator`.
+    """
+
     def __init__(self, evaluators):
-        assert len(evaluators)
+        """
+        Args:
+            evaluators (list): the evaluators to combine.
+        """
         super().__init__()
         self._evaluators = evaluators
 
@@ -66,9 +83,9 @@ class DatasetEvaluators(DatasetEvaluator):
         for evaluator in self._evaluators:
             evaluator.reset()
 
-    def process(self, input, output):
+    def process(self, inputs, outputs):
         for evaluator in self._evaluators:
-            evaluator.process(input, output)
+            evaluator.process(inputs, outputs)
 
     def evaluate(self):
         results = OrderedDict()
@@ -110,7 +127,7 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
     Returns:
         The return value of `evaluator.evaluate()`
     """
-    num_devices = torch.distributed.get_world_size() if torch.distributed.is_initialized() else 1
+    num_devices = get_world_size()
     logger = logging.getLogger(__name__)
     logger.info("Start inference on {} images".format(len(data_loader)))
 
