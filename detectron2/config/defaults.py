@@ -85,7 +85,13 @@ _C.INPUT.FORMAT = "BGR"
 # The ground truth mask format that the model will use.
 # Mask R-CNN supports either "polygon" or "bitmask" as ground truth.
 _C.INPUT.MASK_FORMAT = "polygon"  # alternative: "bitmask"
+
+# Enable rotated copies in training dataset
+_C.INPUT.ROTATION_ENABLED = False
+
+# scale factor
 _C.INPUT.SCALE_FACTOR = 1.0
+
 
 
 # -----------------------------------------------------------------------------
