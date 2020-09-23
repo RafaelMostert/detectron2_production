@@ -7,11 +7,14 @@ inference_test_output
 *.jpg
 *.png
 *.txt
+*.json
+*.diff
 
 # compilation and distribution
 __pycache__
 _ext
 *.pyc
+*.pyd
 *.so
 detectron2.egg-info/
 build/
@@ -33,10 +36,12 @@ wheels/
 *.swp
 *~
 
-# Pycharm editor settings
+# editor settings
 .idea
+.vscode
 
 # project dirs
 /detectron2/model_zoo/configs
 /datasets
+/projects/*/datasets
 /models

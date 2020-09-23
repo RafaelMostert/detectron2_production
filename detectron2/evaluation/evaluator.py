@@ -8,7 +8,7 @@ import torch
 import pickle
 from os import path
 
-from detectron2.utils.comm import is_main_process
+from detectron2.utils.comm import get_world_size, is_main_process
 from detectron2.utils.logger import log_every_n_seconds
 
 
@@ -30,13 +30,20 @@ class DatasetEvaluator:
         """
         pass
 
-    def process(self, input, output):
+    def process(self, inputs, outputs):
         """
-        Process an input/output pair.
+        Process the pair of inputs and outputs.
+        If they contain batches, the pairs can be consumed one-by-one using `zip`:
+
+        .. code-block:: python
+
+            for input_, output in zip(inputs, outputs):
+                # do evaluation on single input/output pair
+                ...
 
         Args:
-            input: the input that's used to call the model.
-            output: the return value of `model(input)`
+            inputs (list): the inputs that's used to call the model.
+            outputs (list): the return value of `model(inputs)`
         """
         pass
 
@@ -57,8 +64,18 @@ class DatasetEvaluator:
 
 
 class DatasetEvaluators(DatasetEvaluator):
+    """
+    Wrapper class to combine multiple :class:`DatasetEvaluator` instances.
+
+    This class dispatches every evaluation call to
+    all of its :class:`DatasetEvaluator`.
+    """
+
     def __init__(self, evaluators):
-        assert len(evaluators)
+        """
+        Args:
+            evaluators (list): the evaluators to combine.
+        """
         super().__init__()
         self._evaluators = evaluators
 
@@ -66,9 +83,9 @@ class DatasetEvaluators(DatasetEvaluator):
         for evaluator in self._evaluators:
             evaluator.reset()
 
-    def process(self, input, output):
+    def process(self, inputs, outputs):
         for evaluator in self._evaluators:
-            evaluator.process(input, output)
+            evaluator.process(inputs, outputs)
 
     def evaluate(self):
         results = OrderedDict()
@@ -110,7 +127,7 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
     Returns:
         The return value of `evaluator.evaluate()`
     """
-    num_devices = torch.distributed.get_world_size() if torch.distributed.is_initialized() else 1
+    num_devices = get_world_size()
     logger = logging.getLogger(__name__)
     logger.info("Start inference on {} images".format(len(data_loader)))
 
@@ -122,10 +139,12 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
     
     predictions_save_path = path.join(evaluator._output_dir,
             f'predictions_{evaluator._dataset_name}.pkl')
-    print(predictions_save_path)
     if not overwrite and path.exists(predictions_save_path):
         # Load existing predictions if overwrite is false
-        evaluator._predictions = load_obj(predictions_save_path)
+        #evaluator._predictions = load_obj(predictions_save_path)
+        (evaluator._predictions, evaluator.focussed_comps, evaluator.related_comps, 
+            evaluator.unrelated_comps,
+            evaluator.n_comps,evaluator.pred_bboxes_scores) = load_obj(predictions_save_path)
     else:
 
         num_warmup = min(5, total - 1)
@@ -161,7 +180,9 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
                         n=10,
                     )
         # Save to pickle
-        save_obj(evaluator._predictions, predictions_save_path)
+        save_obj([evaluator._predictions,evaluator.focussed_comps,evaluator.related_comps,
+            evaluator.unrelated_comps,evaluator.n_comps,evaluator.pred_bboxes_scores], 
+            predictions_save_path)
 
         # Measure the time only for this worker (before the synchronization barrier)
         total_time = time.perf_counter() - start_time
@@ -179,18 +200,18 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
             )
         )
     results = evaluator.evaluate()
-    print(results)
     logger.info(f"LOFAR Evaluation metrics (for all values 0% is best, 100% is worst):")
-    logger.info(f"1. Fraction of predictions that fail to cover a single component source.")
+    logger.info(f"1. Pred. that fail to cover a single comp. source.")
     logger.info(f"{results['bbox']['assoc_single_fail_fraction']:.2%}")
-    logger.info(f"2. Fraction of predictions that fail to cover all components of a " \
-            "multi-component source.")
+    logger.info(f"2. Pred. that fail to cover all comp. of a " \
+            "multi-comp, source.")
     logger.info(f"{results['bbox']['assoc_multi_fail_fraction']:.2%}")
-    logger.info(f"3. Fraction of predictions that include unassociated components for a single component source.")
+    logger.info(f"3. Pred. that include unassociated comp. for a single comp. source.")
     logger.info(f"{results['bbox']['unassoc_single_fail_fraction']:.2%}")
-    logger.info(f"4. Fraction of predictions that include unassociated components for a " \
-            "multi-component source.")
+    logger.info(f"4. Pred. that include unassociated comp. for a " \
+            "multi-comp. source.")
     logger.info(f"{results['bbox']['unassoc_multi_fail_fraction']:.2%}")
+    logger.info(f"Catalogue is {results['bbox']['correct_catalogue']} correct.")
 
     # An evaluator may return None when not in main process.
     # Replace it by an empty dict instead to make it easier for downstream code to handle
