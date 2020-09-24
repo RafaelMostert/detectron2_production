@@ -210,6 +210,9 @@ class LOFAREvaluator(DatasetEvaluator):
         if debug:
             print("pred_bboxes_scores after filtering out the focussed pixel")
             print(pred_central_bboxes_scores[0])
+        # Record for which images we have no central bbox
+        self.central_covered = [True if len(bboxes_scores) > 0 else False 
+                                      for bboxes_scores in pred_central_bboxes_scores]
         
         # Take only the highest scoring bbox from this list of bboxes
         pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
@@ -219,31 +222,30 @@ class LOFAREvaluator(DatasetEvaluator):
             print("pred_bboxes_scores after getting the highest scoring bbox")
             print(pred_central_bboxes_scores[0])
 
-        # Check if other source comps fall inside predicted central box
-        #print("comps")
-        #[print(comps) for comps, (bbox, score) 
-        #                                  in zip(self.related_comps, pred_central_bboxes_scores)]
+        # Check if related source comps fall inside predicted central box
         self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
             bbox[0],bbox[1],bbox[2],bbox[3]) 
                         for x,y in list(zip(comps[0],comps[1]))])
                                           for comps, (bbox, score) 
                                           in zip(self.related_comps, pred_central_bboxes_scores)]
+        assert len(self.unrelated_comps) == len(pred_central_bboxes_scores)
+
         if debug:
             print("comp_scores")
             print(self.comp_scores[0])
-
-        # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
-        includes_associated_fail_fraction = self._check_if_pred_central_bbox_misses_comp(debug=debug)
-        
-        # 3&4. "Predicted central bbox encompasses too many or too few components" can now be checked
-        if debug:
             print('len comp_scores ',len(self.comp_scores))
-        assert len(self.unrelated_comps) == len(pred_central_bboxes_scores)
+
+        # Check if unrelated source comps fall inside predicted central box
         self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
             bbox[0],bbox[1],bbox[2],bbox[3]) 
                     for x,y in zip(xs,ys)])
                             for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
                                 pred_central_bboxes_scores)]
+
+        # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
+        includes_associated_fail_fraction = self._check_if_pred_central_bbox_misses_comp(debug=debug)
+
+        # 3&4. "Predicted central bbox encompasses too many or too few components" can now be checked
         includes_unassociated_fail_fraction = \
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
@@ -255,16 +257,17 @@ class LOFAREvaluator(DatasetEvaluator):
         """Check whether the predicted central box includes a number of unassocatiated components
             as indicated by the ground truth"""
         # Tally for single comp
-        single_comp_success = [total == 0 for n_comp, total in zip(self.n_comps, self.close_comp_scores) 
+        single_comp_fail = [unrelated > 0 for n_comp, unrelated in 
+                zip(self.n_comps, self.close_comp_scores) 
                                if n_comp == 1]
-        single_comp_success_frac = np.sum(single_comp_success)/len(single_comp_success)
+        single_comp_fail_frac = np.sum(single_comp_fail)/len(single_comp_fail)
             
         # Tally for multi comp
-        multi_comp_binary_success = [total == 0 for n_comp, total in 
+        multi_comp_binary_fail = [unrelated > 0 for n_comp, unrelated in 
                                      zip(self.n_comps, self.close_comp_scores) if n_comp > 1]
-        multi_comp_success = [total for n_comp, total in zip(self.n_comps, self.close_comp_scores) 
-                                    if n_comp > 1]
-        multi_comp_binary_success_frac = np.sum(multi_comp_binary_success)/len(multi_comp_binary_success)
+        #multi_comp_success = [total for n_comp, total in zip(self.n_comps, self.close_comp_scores) 
+        #                            if n_comp > 1]
+        multi_comp_binary_fail_frac = np.sum(multi_comp_binary_fail)/len(multi_comp_binary_fail)
         
         if debug:
             # Collect single comp sources that includ unassociated comps
@@ -279,7 +282,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     if ((n_comp > 1) and (0 != total)) ]
             #collect_misboxed(pred, image_dir, output_dir, "unassoc_multi_fail_fraction", fail_indices,
             #        source_names,metadata,gt_data,gt_locs)
-        return 1-single_comp_success_frac, 1-multi_comp_binary_success_frac
+        return single_comp_fail_frac, multi_comp_binary_fail_frac
 
 
 
@@ -288,13 +291,16 @@ class LOFAREvaluator(DatasetEvaluator):
             as indicated by the ground truth"""
 
         # Tally for single comp
-        single_comp_success = [n_comp == (total+1) for n_comp, total in zip(self.n_comps, self.comp_scores) if n_comp == 1]
+        single_comp_success = [central_covered and unrelated == 0) 
+                for n_comp, central_covered, unrelated in zip(self.n_comps,
+            self.central_covered, self.close_comp_scores) if n_comp == 1]
         single_comp_success_frac = np.sum(single_comp_success)/len(single_comp_success)
             
         # Tally for multi comp
-        multi_comp_binary_success = [n_comp == (total+1) for n_comp, total in 
-                                     zip(self.n_comps, self.comp_scores) if n_comp > 1]
-        multi_comp_binary_success_frac = np.sum(multi_comp_binary_success)/len(multi_comp_binary_success)
+        multi_comp_binary_fail = [(central_covered and unrelated == 0 and n_comp > (related+1)) or (not central_covered)
+                for n_comp, related, unrelated in
+                zip(self.n_comps, self.comp_scores, self.close_comp_scores) if n_comp > 1]
+        multi_comp_binary_fail_frac = np.sum(multi_comp_binary_fail)/len(multi_comp_binary_fail)
         
         if debug:
             # Collect single comp sources that fail to include their gt comp
@@ -310,7 +316,7 @@ class LOFAREvaluator(DatasetEvaluator):
             #collect_misboxed(pred, image_dir,output_dir, "assoc_multi_fail_fraction", fail_indices,
             #        source_names,metadata,imsize)
 
-        return 1-single_comp_success_frac, 1-multi_comp_binary_success_frac
+        return 1-single_comp_success_frac, multi_comp_binary_fail_frac
     
 
 
