@@ -258,8 +258,7 @@ class LOFAREvaluator(DatasetEvaluator):
             as indicated by the ground truth"""
         # Tally for single comp
         single_comp_fail = [unrelated > 0 for n_comp, unrelated in 
-                zip(self.n_comps, self.close_comp_scores) 
-                               if n_comp == 1]
+                zip(self.n_comps, self.close_comp_scores) if n_comp == 1]
         single_comp_fail_frac = np.sum(single_comp_fail)/len(single_comp_fail)
             
         # Tally for multi comp
@@ -272,14 +271,15 @@ class LOFAREvaluator(DatasetEvaluator):
         if debug:
             # Collect single comp sources that includ unassociated comps
             ran = list(range(len(self.close_comp_scores)))
-            fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.close_comp_scores) 
-                    if ((n_comp == 1) and (0 != total)) ]
+            fail_indices = [i for i, n_comp, unrelated in 
+                zip(ran, self.n_comps, self.close_comp_scores) if n_comp == 1 and unrelated > 0]
             #collect_misboxed(pred, image_dir, output_dir, "unassoc_single_fail_fraction", fail_indices,
             #        source_names,metadata,gt_data,gt_locs)
 
             # Collect single comp sources that fail to include their gt comp
-            fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.close_comp_scores) 
-                    if ((n_comp > 1) and (0 != total)) ]
+            fail_indices = [i for i, n_comp, unrelated in 
+                                     zip(ran, self.n_comps, self.close_comp_scores) 
+                                     if n_comp > 1 and unrelated > 0]
             #collect_misboxed(pred, image_dir, output_dir, "unassoc_multi_fail_fraction", fail_indices,
             #        source_names,metadata,gt_data,gt_locs)
         return single_comp_fail_frac, multi_comp_binary_fail_frac
@@ -291,32 +291,38 @@ class LOFAREvaluator(DatasetEvaluator):
             as indicated by the ground truth"""
 
         # Tally for single comp
-        single_comp_success = [central_covered and unrelated == 0) 
+        single_comp_fail = [not central_covered 
                 for n_comp, central_covered, unrelated in zip(self.n_comps,
             self.central_covered, self.close_comp_scores) if n_comp == 1]
-        single_comp_success_frac = np.sum(single_comp_success)/len(single_comp_success)
+        single_comp_fail_frac = np.sum(single_comp_fail)/len(single_comp_fail)
             
         # Tally for multi comp
         multi_comp_binary_fail = [(central_covered and unrelated == 0 and n_comp > (related+1)) or (not central_covered)
-                for n_comp, related, unrelated in
-                zip(self.n_comps, self.comp_scores, self.close_comp_scores) if n_comp > 1]
+                for n_comp, central_covered, related, unrelated in
+                zip(self.n_comps, self.central_covered, self.comp_scores, self.close_comp_scores) 
+                if n_comp > 1]
         multi_comp_binary_fail_frac = np.sum(multi_comp_binary_fail)/len(multi_comp_binary_fail)
         
         if debug:
             # Collect single comp sources that fail to include their gt comp
-            ran = list(range(len(self.comp_scores)))
-            fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.comp_scores) 
-                    if ((n_comp == 1) and (n_comp != total)) ]
-            #collect_misboxed(pred, image_dir, output_dir, "assoc_single_fail_fraction", fail_indices,
-            #        source_names,metadata,gt_data,gt_locs, imsize)
+            ran = list(range(len(self.n_comps)))
+            fail_indices = [i for i, n_comp in zip(ran, self.n_comps) 
+                    if n_comp == 1 and not central_covered ]
+            #collect_misboxed(pred, image_dir, output_dir, "assoc_single_fail_fraction",
+            #fail_indices,  source_names,metadata,gt_data,gt_locs, imsize)
 
             # Collect single comp sources that fail to include their gt comp
             fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.comp_scores) 
                     if ((n_comp > 1) and (n_comp != total)) ]
+            fail_indices = [i for i, n_comp, central_covered, related, unrelated in
+                zip(ran, self.n_comps, self.central_covered, self.comp_scores, 
+                    self.close_comp_scores) 
+                if n_comp > 1 and ((central_covered and unrelated == 0 and n_comp > (related+1)) \
+                        or (not central_covered))]
             #collect_misboxed(pred, image_dir,output_dir, "assoc_multi_fail_fraction", fail_indices,
             #        source_names,metadata,imsize)
 
-        return 1-single_comp_success_frac, multi_comp_binary_fail_frac
+        return single_comp_fail_frac, multi_comp_binary_fail_frac
     
 
 
@@ -327,7 +333,6 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    #TODO
     parser.add_argument("--gt-json")
     parser.add_argument("--gt-dir")
     parser.add_argument("--pred-json")
