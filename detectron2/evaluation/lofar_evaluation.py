@@ -138,7 +138,7 @@ class LOFAREvaluator(DatasetEvaluator):
         return copy.deepcopy(self._results)
 
     def baseline(self):
-        total = self.single_comps + self.multi_comps
+        total = len(self.n_comps) #self.single_comps + self.multi_comps
         correct = self.single_comps/total
         print(f"Baseline assumption cat is {correct:.1%} correct")
         return correct
@@ -146,7 +146,7 @@ class LOFAREvaluator(DatasetEvaluator):
     def our_score(self,assoc_fail, unassoc_fail, suffix=''):
         fail_single = assoc_fail[0]*self.single_comps + unassoc_fail[0]*self.single_comps
         fail_multi = assoc_fail[1]*self.multi_comps + unassoc_fail[1]*self.multi_comps
-        total = self.single_comps + self.multi_comps
+        total = len(self.n_comps) # self.single_comps + self.multi_comps
         correct = (total-(fail_single+fail_multi))/total
         print(f"{self._dataset_name} cat is {correct:.1%} correct")
         return correct
