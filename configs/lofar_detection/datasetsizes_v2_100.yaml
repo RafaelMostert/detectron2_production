@@ -1,14 +1,15 @@
 _BASE_: "base_lofar.yaml"
-OUTPUT_DIR: "/data/mostertrij/tridentnet/output/v1_stepLR/"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/v2_100/"
 DATASETS:
+  TRAIN_SIZE: 100
   TRAIN: ("train",)
   TEST: ("train","val")
 SOLVER:
   #LR_SCHEDULER_NAME:  "WarmupCosineLR" 
   BASE_LR: 0.0003
-  STEPS: (100000,150000)
-  MAX_ITER: 200000 
+  STEPS: ()
+  MAX_ITER: 60000 
   CHECKPOINT_PERIOD: 100000
 TEST:
-  EVAL_PERIOD: 20000
-  EXTRA_EVAL: [1,500,1000,2500,10000]
+  EVAL_PERIOD: 999999999999
+  #EXTRA_EVAL: [1,500,1000,2500,10000]
