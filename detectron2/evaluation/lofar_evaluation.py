@@ -215,20 +215,20 @@ class LOFAREvaluator(DatasetEvaluator):
                                       for bboxes_scores in pred_central_bboxes_scores]
         
         # Take only the highest scoring bbox from this list of bboxes
-        pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
+        self.pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
                                       if len(bboxes_scores) > 0 else [[-1,-1,-1,-1],0] 
                                       for bboxes_scores in pred_central_bboxes_scores]
         if debug:
             print("pred_bboxes_scores after getting the highest scoring bbox")
-            print(pred_central_bboxes_scores[0])
+            print(self.pred_central_bboxes_scores[0])
 
         # Check if related source comps fall inside predicted central box
         self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
             bbox[0],bbox[1],bbox[2],bbox[3]) 
                         for x,y in list(zip(comps[0],comps[1]))])
-                                          for comps, (bbox, score) 
-                                          in zip(self.related_comps, pred_central_bboxes_scores)]
-        assert len(self.unrelated_comps) == len(pred_central_bboxes_scores)
+                        for comps, (bbox, score) 
+                        in zip(self.related_comps, self.pred_central_bboxes_scores)]
+        assert len(self.unrelated_comps) == len(self.pred_central_bboxes_scores)
 
         if debug:
             print("comp_scores")
@@ -240,7 +240,7 @@ class LOFAREvaluator(DatasetEvaluator):
             bbox[0],bbox[1],bbox[2],bbox[3]) 
                     for x,y in zip(xs,ys)])
                             for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
-                                pred_central_bboxes_scores)]
+                                self.pred_central_bboxes_scores)]
 
         # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
         includes_associated_fail_fraction = self._check_if_pred_central_bbox_misses_comp(debug=debug)
@@ -249,8 +249,74 @@ class LOFAREvaluator(DatasetEvaluator):
         includes_unassociated_fail_fraction = \
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
+        plot_predictions(self, "val_prediction_debug_images", imsize=200, debug=False)
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
+
+    def plot_predictions(self, fail_dir_name, imsize=200, debug=False):
+        """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
+        components so that they can be inspected to improve the box-draw-process"""
+        if self._dataset_name != 'val':
+            return
+        print("Inside plot_predictions, outputdir is:", self._output_dir)
+        # Make dir to collect the failed images in
+        fail_dir = os.path.join(self._output_dir, fail_dir_name)
+        os.makedirs(fail_dir,exist_ok=True)
+        # Remove old directory but first check that it contains only pngs
+        for f in os.listdir(fail_dir):
+            assert f.endswith('.png'), 'Directory should only contain images.'
+        for f in os.listdir(fail_dir):
+            os.remove(os.path.join(fail_dir,f))
+
+        # Copy debug images to this dir 
+        if debug:
+            print('misboxed output dir',fail_dir)
+            print(self._dataset_name)
+
+        # if code fails here the debug source name or path is probably incorrect
+        image_source_paths = [p["filename"] for p in self._predictions]
+        source_names = [p.split('/')[-1] for p in image_source_paths]
+        image_dest_paths = [os.path.join(fail_dir, image_source_path.split('/')[-1])
+                for image_source_path in image_source_paths]
+        image_only=False
+        if image_only:
+
+            for src, dest in zip(image_source_paths, image_dest_paths):
+                with open(src, 'rb') as fin:
+                    with open(dest, 'wb') as fout:
+                        copyfileobj(fin, fout, 128*1024)
+        else:
+
+            # Iterate over all failed  items
+            for i, (focus_l, rel_l, unrel_l, (bbox,score), src, dest) 
+                in enumerate(zip(self.focussed_comps,
+                self.related_comps, self.unrelated_comps, self.pred_central_bboxes, 
+                image_source_paths, image_dest_paths)):
+                #print(source_names[i])
+
+                # Open mispredicted image 
+                #if debug:
+                #    print(src)
+                #print(src)
+                im = imread(src)
+
+                # Plot figure 
+                f, ax1 = plt.subplots(1,1, figsize=(10,8))
+                # Radio intensity + ground truth bboxes
+                ax1.imshow(im)
+                ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
+                        imsize-np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
+                ax1.set_title('Predicted bounding box')
+                # Plot component locations
+                ax1.plot(focus_l[0],imsize-focus_l[1],marker='s',color='r')
+                for x,y in zip(rel_l[0],rel_l[1]):
+                    ax1.plot(x,imsize-np.array(y),marker='.',color='r')
+                for x,y in zip(unrel_l[0],unrel_l[1]):
+                    ax1.plot(x,imsize-np.array(y),marker='.',color='lime')
+
+
+                plt.savefig(dest, bbox_inches='tight')
+                plt.close()
 
         
     def _check_if_pred_central_bbox_includes_unassociated_comps(self, debug=False):
@@ -273,14 +339,14 @@ class LOFAREvaluator(DatasetEvaluator):
             ran = list(range(len(self.close_comp_scores)))
             fail_indices = [i for i, n_comp, unrelated in 
                 zip(ran, self.n_comps, self.close_comp_scores) if n_comp == 1 and unrelated > 0]
-            #collect_misboxed(pred, image_dir, output_dir, "unassoc_single_fail_fraction", fail_indices,
+            #plot_predictions(pred, image_dir, output_dir, "unassoc_single_fail_fraction", fail_indices,
             #        source_names,metadata,gt_data,gt_locs)
 
             # Collect single comp sources that fail to include their gt comp
             fail_indices = [i for i, n_comp, unrelated in 
                                      zip(ran, self.n_comps, self.close_comp_scores) 
                                      if n_comp > 1 and unrelated > 0]
-            #collect_misboxed(pred, image_dir, output_dir, "unassoc_multi_fail_fraction", fail_indices,
+            #plot_predictions(pred, image_dir, output_dir, "unassoc_multi_fail_fraction", fail_indices,
             #        source_names,metadata,gt_data,gt_locs)
         return single_comp_fail_frac, multi_comp_binary_fail_frac
 
@@ -308,7 +374,7 @@ class LOFAREvaluator(DatasetEvaluator):
             ran = list(range(len(self.n_comps)))
             fail_indices = [i for i, n_comp in zip(ran, self.n_comps) 
                     if n_comp == 1 and not central_covered ]
-            #collect_misboxed(pred, image_dir, output_dir, "assoc_single_fail_fraction",
+            #plot_predictions(pred, image_dir, output_dir, "assoc_single_fail_fraction",
             #fail_indices,  source_names,metadata,gt_data,gt_locs, imsize)
 
             # Collect single comp sources that fail to include their gt comp
@@ -319,7 +385,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     self.close_comp_scores) 
                 if n_comp > 1 and ((central_covered and unrelated == 0 and n_comp > (related+1)) \
                         or (not central_covered))]
-            #collect_misboxed(pred, image_dir,output_dir, "assoc_multi_fail_fraction", fail_indices,
+            #plot_predictions(pred, image_dir,output_dir, "assoc_multi_fail_fraction", fail_indices,
             #        source_names,metadata,imsize)
 
         return single_comp_fail_frac, multi_comp_binary_fail_frac
