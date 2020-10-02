@@ -1,5 +1,4 @@
-_BASE_: "base_lofar_fast_rcnn"
-MODEL:
+_BASE_: "base_lofar_fast_rcnn.yaml"
 OUTPUT_DIR: "/data/mostertrij/tridentnet/output/v4_1000/"
 DATASETS:
   TEST: ("train","val","test")
@@ -9,6 +8,5 @@ SOLVER:
   STEPS: ()
   MAX_ITER: 80000
   CHECKPOINT_PERIOD: 2000000
-#TEST:
-EVAL_PERIOD: 20000
-#EXTRA_EVAL: [1,500,1000,2500,5000,10000,15000]
+TEST:
+  EVAL_PERIOD: 20000
