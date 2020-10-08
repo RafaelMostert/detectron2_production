@@ -14,6 +14,7 @@ from collections import OrderedDict
 from fvcore.common.file_io import PathManager
 from PIL import Image
 from tabulate import tabulate
+import matplotlib.pyplot as plt
 
 from detectron2.data import MetadataCatalog
 from detectron2.utils import comm
@@ -241,7 +242,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     for x,y in zip(xs,ys)])
                             for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
                                 self.pred_central_bboxes_scores)]
-
+        debug=True
         # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
         includes_associated_fail_fraction = self._check_if_pred_central_bbox_misses_comp(debug=debug)
 
@@ -249,18 +250,20 @@ class LOFAREvaluator(DatasetEvaluator):
         includes_unassociated_fail_fraction = \
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
-        plot_predictions(self, "val_prediction_debug_images", imsize=200, debug=False)
+        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
 
-    def plot_predictions(self, fail_dir_name, imsize=200, debug=False):
+    def plot_predictions(self, fail_dir_name, imsize=200,cutout_list=None, debug=False, lgm_to_kafka=False):
         """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
         components so that they can be inspected to improve the box-draw-process"""
-        if self._dataset_name != 'val':
+        if self._dataset_name != 'val' or cutout_list is None:
             return
+        from cv2 import imread
+
         print("Inside plot_predictions, outputdir is:", self._output_dir)
         # Make dir to collect the failed images in
-        fail_dir = os.path.join(self._output_dir, fail_dir_name)
+        fail_dir = os.path.join(self._output_dir, self._dataset_name+'_'+fail_dir_name)
         os.makedirs(fail_dir,exist_ok=True)
         # Remove old directory but first check that it contains only pngs
         for f in os.listdir(fail_dir):
@@ -274,7 +277,11 @@ class LOFAREvaluator(DatasetEvaluator):
             print(self._dataset_name)
 
         # if code fails here the debug source name or path is probably incorrect
-        image_source_paths = [p["filename"] for p in self._predictions]
+        image_source_paths = [p["file_name"] for p in self._predictions[0]]
+        lgm_to_kafka=True
+        if lgm_to_kafka:
+            image_source_paths = [p.replace('data1','home/rafael/data') for p in image_source_paths]
+            
         source_names = [p.split('/')[-1] for p in image_source_paths]
         image_dest_paths = [os.path.join(fail_dir, image_source_path.split('/')[-1])
                 for image_source_path in image_source_paths]
@@ -287,17 +294,21 @@ class LOFAREvaluator(DatasetEvaluator):
                         copyfileobj(fin, fout, 128*1024)
         else:
 
+
+            #for i, (focus_l, rel_l, unrel_l, (bbox,score), src, dest) in enumerate(zip(self.focussed_comps,
+            #    self.related_comps, self.unrelated_comps, self.pred_central_bboxes_scores, 
+            #    image_source_paths, image_dest_paths)):
             # Iterate over all failed  items
-            for i, (focus_l, rel_l, unrel_l, (bbox,score), src, dest) 
-                in enumerate(zip(self.focussed_comps,
-                self.related_comps, self.unrelated_comps, self.pred_central_bboxes, 
-                image_source_paths, image_dest_paths)):
+            for i in cutout_list:
+                focus_l, rel_l, unrel_l, (bbox,score), src, dest =  self.focussed_comps[i], \
+                    self.related_comps[i], self.unrelated_comps[i], \
+                    self.pred_central_bboxes_scores[i], image_source_paths[i], image_dest_paths[i]
+
                 #print(source_names[i])
 
                 # Open mispredicted image 
                 #if debug:
                 #    print(src)
-                #print(src)
                 im = imread(src)
 
                 # Plot figure 
@@ -305,14 +316,18 @@ class LOFAREvaluator(DatasetEvaluator):
                 # Radio intensity + ground truth bboxes
                 ax1.imshow(im)
                 ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
-                        imsize-np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
+                        np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
+                #imsize-np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
                 ax1.set_title('Predicted bounding box')
                 # Plot component locations
-                ax1.plot(focus_l[0],imsize-focus_l[1],marker='s',color='r')
+                ax1.plot(focus_l[0],focus_l[1],marker='s',color='r')
+                #ax1.plot(focus_l[0],imsize-focus_l[1],marker='s',color='r')
                 for x,y in zip(rel_l[0],rel_l[1]):
-                    ax1.plot(x,imsize-np.array(y),marker='.',color='r')
+                    ax1.plot(x,np.array(y),marker='.',color='r')
+                    #ax1.plot(x,imsize-np.array(y),marker='.',color='r')
                 for x,y in zip(unrel_l[0],unrel_l[1]):
-                    ax1.plot(x,imsize-np.array(y),marker='.',color='lime')
+                    ax1.plot(x,np.array(y),marker='.',color='lime')
+                    #ax1.plot(x,imsize-np.array(y),marker='.',color='lime')
 
 
                 plt.savefig(dest, bbox_inches='tight')
@@ -339,15 +354,13 @@ class LOFAREvaluator(DatasetEvaluator):
             ran = list(range(len(self.close_comp_scores)))
             fail_indices = [i for i, n_comp, unrelated in 
                 zip(ran, self.n_comps, self.close_comp_scores) if n_comp == 1 and unrelated > 0]
-            #plot_predictions(pred, image_dir, output_dir, "unassoc_single_fail_fraction", fail_indices,
-            #        source_names,metadata,gt_data,gt_locs)
+            self.plot_predictions("single_overestimation", imsize=200,cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
 
             # Collect single comp sources that fail to include their gt comp
             fail_indices = [i for i, n_comp, unrelated in 
                                      zip(ran, self.n_comps, self.close_comp_scores) 
                                      if n_comp > 1 and unrelated > 0]
-            #plot_predictions(pred, image_dir, output_dir, "unassoc_multi_fail_fraction", fail_indices,
-            #        source_names,metadata,gt_data,gt_locs)
+            self.plot_predictions("multi_overestimation", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
         return single_comp_fail_frac, multi_comp_binary_fail_frac
 
 
@@ -358,8 +371,8 @@ class LOFAREvaluator(DatasetEvaluator):
 
         # Tally for single comp
         single_comp_fail = [not central_covered 
-                for n_comp, central_covered, unrelated in zip(self.n_comps,
-            self.central_covered, self.close_comp_scores) if n_comp == 1]
+                for n_comp, central_covered in zip(self.n_comps,
+            self.central_covered) if n_comp == 1]
         single_comp_fail_frac = np.sum(single_comp_fail)/len(single_comp_fail)
             
         # Tally for multi comp
@@ -372,11 +385,9 @@ class LOFAREvaluator(DatasetEvaluator):
         if debug:
             # Collect single comp sources that fail to include their gt comp
             ran = list(range(len(self.n_comps)))
-            fail_indices = [i for i, n_comp in zip(ran, self.n_comps) 
+            fail_indices = [i for i, n_comp,central_covered in zip(ran, self.n_comps, self.central_covered) 
                     if n_comp == 1 and not central_covered ]
-            #plot_predictions(pred, image_dir, output_dir, "assoc_single_fail_fraction",
-            #fail_indices,  source_names,metadata,gt_data,gt_locs, imsize)
-
+            self.plot_predictions("single_missing", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
             # Collect single comp sources that fail to include their gt comp
             fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.comp_scores) 
                     if ((n_comp > 1) and (n_comp != total)) ]
@@ -385,8 +396,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     self.close_comp_scores) 
                 if n_comp > 1 and ((central_covered and unrelated == 0 and n_comp > (related+1)) \
                         or (not central_covered))]
-            #plot_predictions(pred, image_dir,output_dir, "assoc_multi_fail_fraction", fail_indices,
-            #        source_names,metadata,imsize)
+            self.plot_predictions("multi_underestimation", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
 
         return single_comp_fail_frac, multi_comp_binary_fail_frac
     
