@@ -106,8 +106,8 @@ for i, d in enumerate(random.sample(inference_dict, 3)):
 # this works for the after the fact test eval
 # for train eval those things are somewhere within a model 
 # specifically a model that takes data and retuns a dict of losses
-print("Load model")
-pretrained_model_path = os.path.join(cfg.OUTPUT_DIR,"model_final.pth")
+pretrained_model_path = "/data1/mostertrij/tridentnet/output/v4_all_withRot/model_final.pth"
+print("Load model:", pretrained_model_path)
 cfg.MODEL.WEIGHTS = os.path.join(pretrained_model_path)  # path to the model we just trained
 trainer = LOFARTrainer(cfg) 
 os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
@@ -116,7 +116,8 @@ trainer.resume_or_load(resume=True)
 print('Load inference loader.')
 inference_loader = build_detection_test_loader(cfg, f"inference")
 print('Load LOFAR evaluator.')
-evaluator = LOFAREvaluator(f"inference", cfg.OUTPUT_DIR, distributed=True)
+evaluator = LOFAREvaluator(f"inference", cfg.OUTPUT_DIR, distributed=True, inference_only=True,
+        lgm=lgm_switch)
 print('Start inference on dataset.')
 predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=False)
 print('Done with inference.')

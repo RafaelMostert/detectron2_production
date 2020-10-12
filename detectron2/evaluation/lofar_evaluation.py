@@ -42,7 +42,7 @@ class LOFAREvaluator(DatasetEvaluator):
     5. The prediction score is lower than x
     """
 
-    def __init__(self, dataset_name, output_dir, distributed=True):
+    def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False, lgm=False):
         """
         Args:
             dataset_name (str): name of the dataset
@@ -63,6 +63,8 @@ class LOFAREvaluator(DatasetEvaluator):
         self._distributed = distributed
         self._cpu_device = torch.device("cpu")
         self._predictions_json = os.path.join(output_dir, "predictions.json")
+        self.inference_only=inference_only
+        self.lgm = lgm
 
     def reset(self):
         self._predictions = []
@@ -97,7 +99,7 @@ class LOFAREvaluator(DatasetEvaluator):
                   image_dict['instances'].get_fields()['scores'].numpy()) 
                  for image_dict in self._predictions]
 
-    def evaluate(self):
+    def evaluate(self, inference_only=False):
         # for parallel execution 
         if self._distributed:
             comm.synchronize()
@@ -242,7 +244,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     for x,y in zip(xs,ys)])
                             for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
                                 self.pred_central_bboxes_scores)]
-        debug=True
+        debug=False
         # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
         includes_associated_fail_fraction = self._check_if_pred_central_bbox_misses_comp(debug=debug)
 
@@ -250,6 +252,7 @@ class LOFAREvaluator(DatasetEvaluator):
         includes_unassociated_fail_fraction = \
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
+        print("Plot predictions")
         self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
@@ -257,7 +260,7 @@ class LOFAREvaluator(DatasetEvaluator):
     def plot_predictions(self, fail_dir_name, imsize=200,cutout_list=None, debug=False, lgm_to_kafka=False):
         """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
         components so that they can be inspected to improve the box-draw-process"""
-        if self._dataset_name != 'val' or cutout_list is None:
+        if (self._dataset_name not in [ 'val','inference']) or cutout_list is None:
             return
         from cv2 import imread
 
@@ -272,15 +275,19 @@ class LOFAREvaluator(DatasetEvaluator):
             os.remove(os.path.join(fail_dir,f))
 
         # Copy debug images to this dir 
+        debug=True
         if debug:
             print('misboxed output dir',fail_dir)
             print(self._dataset_name)
 
         # if code fails here the debug source name or path is probably incorrect
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
-        lgm_to_kafka=True
+        lgm_to_kafka=False
+        kafka_to_lgm=True
         if lgm_to_kafka:
             image_source_paths = [p.replace('data1','home/rafael/data') for p in image_source_paths]
+        if kafka_to_lgm:
+            image_source_paths = [p.replace('home/rafael/data','data1') for p in image_source_paths]
             
         source_names = [p.split('/')[-1] for p in image_source_paths]
         image_dest_paths = [os.path.join(fail_dir, image_source_path.split('/')[-1])
@@ -308,7 +315,7 @@ class LOFAREvaluator(DatasetEvaluator):
 
                 # Open mispredicted image 
                 #if debug:
-                #    print(src)
+                print(src)
                 im = imread(src)
 
                 # Plot figure 
