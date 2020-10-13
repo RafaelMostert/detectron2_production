@@ -42,7 +42,8 @@ class LOFAREvaluator(DatasetEvaluator):
     5. The prediction score is lower than x
     """
 
-    def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False, lgm=False):
+    def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False,
+            kafka_to_lgm=False):
         """
         Args:
             dataset_name (str): name of the dataset
@@ -64,7 +65,7 @@ class LOFAREvaluator(DatasetEvaluator):
         self._cpu_device = torch.device("cpu")
         self._predictions_json = os.path.join(output_dir, "predictions.json")
         self.inference_only=inference_only
-        self.lgm = lgm
+        self.kafka_to_lgm = kafka_to_lgm
 
     def reset(self):
         self._predictions = []
@@ -282,11 +283,11 @@ class LOFAREvaluator(DatasetEvaluator):
 
         # if code fails here the debug source name or path is probably incorrect
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
-        lgm_to_kafka=False
-        kafka_to_lgm=True
-        if lgm_to_kafka:
-            image_source_paths = [p.replace('data1','home/rafael/data') for p in image_source_paths]
-        if kafka_to_lgm:
+        #lgm_to_kafka=False
+        #kafka_to_lgm=True
+        #if lgm_to_kafka:
+        #    image_source_paths = [p.replace('data1','home/rafael/data') for p in image_source_paths]
+        if self.kafka_to_lgm:
             image_source_paths = [p.replace('home/rafael/data','data1') for p in image_source_paths]
             
         source_names = [p.split('/')[-1] for p in image_source_paths]
