@@ -66,7 +66,8 @@ def get_lofar_dicts(annotation_filepath):
         else:
             if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
                 if len(argv) == 3:
-                    dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
+                    #dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
+                    dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/home/rafael/data/mostertrij",start_dir)
                 new_data.append(dataset_dicts[i])
                 counter+=1
     print('len dataset is:', len(new_data), annotation_filepath)
@@ -117,7 +118,7 @@ print('Load inference loader.')
 inference_loader = build_detection_test_loader(cfg, f"inference")
 print('Load LOFAR evaluator.')
 evaluator = LOFAREvaluator(f"inference", cfg.OUTPUT_DIR, distributed=True, inference_only=True,
-        lgm=lgm_switch)
+        kafka_to_lgm=True)
 print('Start inference on dataset.')
 predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=False)
 print('Done with inference.')
