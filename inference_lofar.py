@@ -58,38 +58,31 @@ def get_lofar_dicts(annotation_filepath):
             ob['bbox_mode'] = BoxMode.XYXY_ABS
         if cfg.MODEL.PROPOSAL_GENERATOR:
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
-        if cfg.INPUT.ROTATION_ENABLED:
+
+        if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
             if len(argv) == 3:
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
-            counter+=1 
-        else:
-            if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
-                if len(argv) == 3:
-                    dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
-                new_data.append(dataset_dicts[i])
-                counter+=1
+            counter+=1
+
     print('len dataset is:', len(new_data), annotation_filepath)
     return new_data
 
 # Register data inside detectron
 # With DATASET_SIZES one can limit the size of these datasets
 d = "inference"
-DatasetCatalog.register(d, lambda d=d:
-                        get_lofar_dicts(os.path.join(
-                            DATASET_PATH,f"VIA_json_inference.pkl")))
+inference_dict = get_lofar_dicts(os.path.join(DATASET_PATH,"VIA_json_inference.pkl")) 
+DatasetCatalog.register(d, lambda d=d: inference_dict)
 MetadataCatalog.get(d).set(thing_classes=["radio_source"])
-
 lofar_metadata = MetadataCatalog.get(d)
 
 
 print("Sample and plot input data as sanity check")
-inference_dict = get_lofar_dicts(os.path.join(DATASET_PATH,"VIA_json_inference.pkl")) 
 #"""
-for i, d in enumerate(random.sample(inference_dict, 3)):
-    img = imread(d["file_name"])
-    visualizer = Visualizer(img[:, :, ::-1], metadata=lofar_metadata, scale=0.5)
-    vis = visualizer.draw_dataset_dict(d)
+for i, dic in enumerate(random.sample(inference_dict, 3)):
+    img = imread(dic["file_name"])
+    visualizer = Visualizer(img[:, :, ::-1], metadata=lofar_metadata, scale=1)
+    vis = visualizer.draw_dataset_dict(dic)
     a= vis.get_image()[:, :, ::-1]
     plt.figure(figsize=(10,10))
     plt.imshow(a)
@@ -106,7 +99,7 @@ for i, d in enumerate(random.sample(inference_dict, 3)):
 # this works for the after the fact test eval
 # for train eval those things are somewhere within a model 
 # specifically a model that takes data and retuns a dict of losses
-pretrained_model_path = "/data1/mostertrij/tridentnet/output/v4_all_withRot/model_final.pth"
+pretrained_model_path = "/home/rafael/data/mostertrij/tridentnet/output/v4_all_withRot/model_final.pth"
 print("Load model:", pretrained_model_path)
 cfg.MODEL.WEIGHTS = os.path.join(pretrained_model_path)  # path to the model we just trained
 trainer = LOFARTrainer(cfg) 
@@ -114,10 +107,10 @@ os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
 trainer.resume_or_load(resume=True)
 
 print('Load inference loader.')
-inference_loader = build_detection_test_loader(cfg, f"inference")
+inference_loader = build_detection_test_loader(cfg, d)
 print('Load LOFAR evaluator.')
-evaluator = LOFAREvaluator(f"inference", cfg.OUTPUT_DIR, distributed=True, inference_only=True,
-        lgm=lgm_switch)
+evaluator = LOFAREvaluator(d, cfg.OUTPUT_DIR, distributed=True, inference_only=True,
+        kafka_to_lgm=False,component_save_name="predicted_component_catalogue")
 print('Start inference on dataset.')
 predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=False)
 print('Done with inference.')

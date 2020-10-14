@@ -244,6 +244,10 @@ class LOFAREvaluator(DatasetEvaluator):
         comp_df.to_hdf(hdf_path,'df')
         # Save to fits
         fits_path = os.path.join(self._output_dir,self.save_name + ".fits")
+        if os.path.exists(fits_path):
+            print("Component fits fil Overwriting it nowe already exists. Overwriting it now")
+            # Remove old fits file
+            os.remove(fits_path)
         t = Table([combined_names,comp_names], names=('Source_Name', 'Component_Name'))
         t.write(fits_path, format='fits')
 
@@ -370,14 +374,9 @@ class LOFAREvaluator(DatasetEvaluator):
         debug=True
         if debug:
             print('misboxed output dir',fail_dir)
-            print(self._dataset_name)
 
         # if code fails here the debug source name or path is probably incorrect
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
-        #lgm_to_kafka=False
-        #kafka_to_lgm=True
-        #if lgm_to_kafka:
-        #    image_source_paths = [p.replace('data1','home/rafael/data') for p in image_source_paths]
         if self.kafka_to_lgm:
             image_source_paths = [p.replace('home/rafael/data','data1') for p in image_source_paths]
             
@@ -392,21 +391,12 @@ class LOFAREvaluator(DatasetEvaluator):
                     with open(dest, 'wb') as fout:
                         copyfileobj(fin, fout, 128*1024)
         else:
-
-
-            #for i, (focus_l, rel_l, unrel_l, (bbox,score), src, dest) in enumerate(zip(self.focussed_comps,
-            #    self.related_comps, self.unrelated_comps, self.pred_central_bboxes_scores, 
-            #    image_source_paths, image_dest_paths)):
-            # Iterate over all failed  items
             for i in cutout_list:
                 focus_l, rel_l, unrel_l, (bbox,score), src, dest =  self.focussed_comps[i], \
                     self.related_comps[i], self.unrelated_comps[i], \
                     self.pred_central_bboxes_scores[i], image_source_paths[i], image_dest_paths[i]
 
-                #print(source_names[i])
-
-                # Open mispredicted image 
-                #if debug:
+                # Open image 
                 #print(src)
                 im = imread(src)
 
