@@ -2,6 +2,7 @@
 import copy
 from operator import itemgetter
 import contextlib
+import pandas as pd
 import io
 import numpy as np
 import torch
@@ -15,6 +16,7 @@ from fvcore.common.file_io import PathManager
 from PIL import Image
 from tabulate import tabulate
 import matplotlib.pyplot as plt
+from astropy.table import Table
 
 from detectron2.data import MetadataCatalog
 from detectron2.utils import comm
@@ -43,7 +45,7 @@ class LOFAREvaluator(DatasetEvaluator):
     """
 
     def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False,
-            kafka_to_lgm=False):
+            kafka_to_lgm=False,component_save_name=None):
         """
         Args:
             dataset_name (str): name of the dataset
@@ -66,6 +68,7 @@ class LOFAREvaluator(DatasetEvaluator):
         self._predictions_json = os.path.join(output_dir, "predictions.json")
         self.inference_only=inference_only
         self.kafka_to_lgm = kafka_to_lgm
+        self.save_name = component_save_name
 
     def reset(self):
         self._predictions = []
@@ -78,7 +81,12 @@ class LOFAREvaluator(DatasetEvaluator):
     def process(self, inputs, outputs):
         # Save ground truths and predicted bounding boxes to this class
         for input, output in zip(inputs, outputs):
-            prediction = {"image_id": input["image_id"], "file_name":input["file_name"],
+            if self.inference_only:
+                prediction = {"image_id": input["image_id"], "file_name":input["file_name"],
+                    "focussed_comp":input["focussed_comp"],"related_comp":input["related_comp"],
+                    "unrelated_comp":input["unrelated_comp"],"unrelated_names":input["unrelated_names"]}
+            else:
+                prediction = {"image_id": input["image_id"], "file_name":input["file_name"],
                     "focussed_comp":input["focussed_comp"],"related_comp":input["related_comp"],
                     "unrelated_comp":input["unrelated_comp"]}
 
@@ -87,11 +95,16 @@ class LOFAREvaluator(DatasetEvaluator):
                 prediction["instances"] = instances
             self._predictions.append(prediction)
 
+        self.focussed_names = [p["file_name"].split('/')[-1].split('_')[0]
+                for p in self._predictions]
         self.focussed_comps = [[p["focussed_comp"][0][0], p["focussed_comp"][1][0]] 
                 for p in self._predictions]
         self.related_comps = [p["related_comp"] if len(p["related_comp"])>0 else [[],[]] 
                 for p in self._predictions]
         self.unrelated_comps = [p["unrelated_comp"] if len(p["unrelated_comp"])>0 else [[],[]] 
+                for p in self._predictions]
+        if self.inference_only:
+            self.unrelated_names = [p["unrelated_names"] if len(p["unrelated_names"])>0 else [] 
                 for p in self._predictions]
         self.n_comps = [1+len(c[0]) if len(c[0])>0 else 1 for c in self.related_comps]
         
@@ -100,7 +113,7 @@ class LOFAREvaluator(DatasetEvaluator):
                   image_dict['instances'].get_fields()['scores'].numpy()) 
                  for image_dict in self._predictions]
 
-    def evaluate(self, inference_only=False):
+    def evaluate(self):
         # for parallel execution 
         if self._distributed:
             comm.synchronize()
@@ -124,22 +137,25 @@ class LOFAREvaluator(DatasetEvaluator):
 
 
 
-        includes_associated_fail_fraction, includes_unassociated_fail_fraction = \
-            self._evaluate_predictions_on_lofar_score()
+        if self.inference_only:
+            return copy.deepcopy(self.return_component_list())
+        else:
+            includes_associated_fail_fraction, includes_unassociated_fail_fraction = \
+                self._evaluate_predictions_on_lofar_score()
 
-        # Calculate/print catalogue improvement
-        base_score = self.baseline()
-        correct_cat = self.our_score(includes_associated_fail_fraction, includes_unassociated_fail_fraction)
-        self.improv(base_score, correct_cat)
+            # Calculate/print catalogue improvement
+            base_score = self.baseline()
+            correct_cat = self.our_score(includes_associated_fail_fraction, includes_unassociated_fail_fraction)
+            self.improv(base_score, correct_cat)
 
-        self._results = OrderedDict()
-        self._results["bbox"] = {"assoc_single_fail_fraction": includes_associated_fail_fraction[0],
-        "assoc_multi_fail_fraction": includes_associated_fail_fraction[1],
-        "unassoc_single_fail_fraction": includes_unassociated_fail_fraction[0],
-        "unassoc_multi_fail_fraction": includes_unassociated_fail_fraction[1],
-        "correct_catalogue": correct_cat}
-        # Copy so the caller can do whatever with results
-        return copy.deepcopy(self._results)
+            self._results = OrderedDict()
+            self._results["bbox"] = {"assoc_single_fail_fraction": includes_associated_fail_fraction[0],
+            "assoc_multi_fail_fraction": includes_associated_fail_fraction[1],
+            "unassoc_single_fail_fraction": includes_unassociated_fail_fraction[0],
+            "unassoc_multi_fail_fraction": includes_unassociated_fail_fraction[1],
+            "correct_catalogue": correct_cat}
+            # Copy so the caller can do whatever with results
+            return copy.deepcopy(self._results)
 
     def baseline(self):
         total = len(self.n_comps) #self.single_comps + self.multi_comps
@@ -158,6 +174,9 @@ class LOFAREvaluator(DatasetEvaluator):
     def improv(self, baseline, our_score):
         print(f"{(our_score-baseline)/baseline:.2%} improvement")
 
+    def area(self, bbox):
+        return (bbox[2]-bbox[0]) * (bbox[3]-bbox[1])
+
     def is_within(self, x,y,xmin,ymin,xmax,ymax):
         """Return true if x, y lies within xmin,ymin,xmax,ymax.
         False otherwise.
@@ -166,6 +185,80 @@ class LOFAREvaluator(DatasetEvaluator):
             return True
         else:
             return False
+
+
+    def return_component_list(self, scale_factor=1, debug=False, imsize=200):
+        """ 
+        return component list in case of inference
+        """
+        print("Return component list")
+
+        # Filter out predicted bboxes that do not cover the focussed pixel
+        pred_central_bboxes_scores = [[(tuple(bbox),score) for bbox, score in zip(bboxes, scores) 
+                            if self.is_within(x*scale_factor,y*scale_factor, 
+                                bbox[0],bbox[1],bbox[2],bbox[3])] 
+                              for (x, y), (bboxes, scores) 
+                              in zip(self.focussed_comps, self.pred_bboxes_scores)]
+        
+        # Record for which images we have no central bbox
+        self.central_covered = [True if len(bboxes_scores) > 0 else False 
+                                      for bboxes_scores in pred_central_bboxes_scores]
+        
+        # Take only the highest scoring bbox from this list of bboxes
+        max_score_threshold=0.05
+        self.second_best = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[1:4] 
+                                      if len(bboxes_scores) > 1 else [[[-1,-1,-1,-1],-99]] 
+                                      for bboxes_scores in pred_central_bboxes_scores]
+        self.pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
+                                      if len(bboxes_scores) > 0 else [[-1,-1,-1,-1],0] 
+                                      for bboxes_scores in pred_central_bboxes_scores]
+        max_scores =[score for bbox,score in self.pred_central_bboxes_scores] 
+        self.second_best = [[(box,score) for box,score in bboxes_scores if score >
+            max_score-max_score_threshold]
+                 for bboxes_scores,max_score in zip(self.second_best,max_scores)]
+
+        # Check which components fall within the predicted bbox with the highest score
+        self.comp_inside_box = [[foc_name]+[name for x,y,name in zip(xs,ys,names) 
+                                    if self.is_within(x*scale_factor,y*scale_factor,bbox[0],bbox[1],bbox[2],bbox[3])]
+                            for (xs,ys),names, (bbox, score), foc_name in zip(self.unrelated_comps,
+                                    self.unrelated_names,self.pred_central_bboxes_scores,self.focussed_names)]
+        # Get bbox sizes
+        sizes = [self.area(bbox) for bbox, score in self.pred_central_bboxes_scores]
+        # Get indices of appearing focussed comp with largest box
+        indices = [max([(i,size) for i, (names,size) in enumerate(zip(self.comp_inside_box, sizes)) if
+            foc_name in names], key = lambda t: t[1])[0]
+            for foc_name in self.focussed_names]
+        # remove duplicates
+        indices = list(set(indices))
+        self.comp_inside_box = np.array(self.comp_inside_box)[indices]
+        # Create pandas dataframe 
+        combined_names = []
+        comp_names = []
+        for i, names in enumerate(self.comp_inside_box):
+            for name in names:
+                combined_names.append(f"Combined_{i}")
+                comp_names.append(name)
+        comp_df = pd.DataFrame({"Source_Name":combined_names,"Component_Name":comp_names})
+        # Save to hdf
+        hdf_path = os.path.join(self._output_dir,self.save_name + ".h5")
+        comp_df.to_hdf(hdf_path,'df')
+        # Save to fits
+        fits_path = os.path.join(self._output_dir,self.save_name + ".fits")
+        if os.path.exists(fits_path):
+            print("Component fits fil Overwriting it nowe already exists. Overwriting it now")
+            # Remove old fits file
+            os.remove(fits_path)
+        t = Table([combined_names,comp_names], names=('Source_Name', 'Component_Name'))
+        t.write(fits_path, format='fits')
+
+        print("Plot all predictions")
+        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))),
+                debug=False, show_second_best=True)
+        print("Plot final predictions")
+        self.plot_predictions("final_prediction_debug_images",cutout_list=indices, debug=False)
+        
+        return comp_df
+
 
     def _evaluate_predictions_on_lofar_score(self, scale_factor=1, debug=False, imsize=200):
         """ 
@@ -185,6 +278,7 @@ class LOFAREvaluator(DatasetEvaluator):
             5. The prediction score is lower than x
         
         """
+        print("Evaluate predictions")
         if debug:
             #Check ground truth and prediction values of first item
             print("scale_factor", scale_factor)
@@ -258,7 +352,8 @@ class LOFAREvaluator(DatasetEvaluator):
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
 
-    def plot_predictions(self, fail_dir_name, imsize=200,cutout_list=None, debug=False, lgm_to_kafka=False):
+    def plot_predictions(self, fail_dir_name, imsize=200,cutout_list=None, debug=False,
+            lgm_to_kafka=False, show_second_best=False):
         """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
         components so that they can be inspected to improve the box-draw-process"""
         if (self._dataset_name not in [ 'val','inference']) or cutout_list is None:
@@ -279,14 +374,9 @@ class LOFAREvaluator(DatasetEvaluator):
         debug=True
         if debug:
             print('misboxed output dir',fail_dir)
-            print(self._dataset_name)
 
         # if code fails here the debug source name or path is probably incorrect
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
-        #lgm_to_kafka=False
-        #kafka_to_lgm=True
-        #if lgm_to_kafka:
-        #    image_source_paths = [p.replace('data1','home/rafael/data') for p in image_source_paths]
         if self.kafka_to_lgm:
             image_source_paths = [p.replace('home/rafael/data','data1') for p in image_source_paths]
             
@@ -301,43 +391,41 @@ class LOFAREvaluator(DatasetEvaluator):
                     with open(dest, 'wb') as fout:
                         copyfileobj(fin, fout, 128*1024)
         else:
-
-
-            #for i, (focus_l, rel_l, unrel_l, (bbox,score), src, dest) in enumerate(zip(self.focussed_comps,
-            #    self.related_comps, self.unrelated_comps, self.pred_central_bboxes_scores, 
-            #    image_source_paths, image_dest_paths)):
-            # Iterate over all failed  items
             for i in cutout_list:
                 focus_l, rel_l, unrel_l, (bbox,score), src, dest =  self.focussed_comps[i], \
                     self.related_comps[i], self.unrelated_comps[i], \
                     self.pred_central_bboxes_scores[i], image_source_paths[i], image_dest_paths[i]
 
-                #print(source_names[i])
-
-                # Open mispredicted image 
-                #if debug:
-                print(src)
+                # Open image 
+                #print(src)
                 im = imread(src)
 
                 # Plot figure 
                 f, ax1 = plt.subplots(1,1, figsize=(10,8))
-                # Radio intensity + ground truth bboxes
+                # Radio intensity
                 ax1.imshow(im)
+                # Bounding box
                 ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
                         np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
-                #imsize-np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
+                if show_second_best:
+                    ax1.text(bbox[0],bbox[1],f"{score:.1%}")
+                    for tl, (bbox, score) in enumerate(self.second_best[i]):
+                        # Second best bounding box
+                        if tl==0: ax1.text(bbox[2],bbox[1],f"{score:.1%}")
+                        if tl==1: ax1.text(bbox[2],bbox[3],f"{score:.1%}")
+                        if tl==2: ax1.text(bbox[0],bbox[3],f"{score:.1%}")
+                        ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
+                                np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'gray')
+
+
                 ax1.set_title('Predicted bounding box')
                 # Plot component locations
                 ax1.plot(focus_l[0],focus_l[1],marker='s',color='r')
-                #ax1.plot(focus_l[0],imsize-focus_l[1],marker='s',color='r')
                 for x,y in zip(rel_l[0],rel_l[1]):
-                    ax1.plot(x,np.array(y),marker='.',color='r')
-                    #ax1.plot(x,imsize-np.array(y),marker='.',color='r')
+                    ax1.plot(x,y,marker='.',color='r')
                 for x,y in zip(unrel_l[0],unrel_l[1]):
-                    ax1.plot(x,np.array(y),marker='.',color='lime')
-                    #ax1.plot(x,imsize-np.array(y),marker='.',color='lime')
-
-
+                    ax1.plot(x,y,marker='.',color='lime')
+                # Save and close plot
                 plt.savefig(dest, bbox_inches='tight')
                 plt.close()
 

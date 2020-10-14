@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import torch
 import pickle
 from os import path
+import pandas as pd
 
 from detectron2.utils.comm import get_world_size, is_main_process
 from detectron2.utils.logger import log_every_n_seconds
@@ -141,10 +142,11 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
             f'predictions_{evaluator._dataset_name}.pkl')
     if not overwrite and path.exists(predictions_save_path):
         # Load existing predictions if overwrite is false
+        print("Loading existing predictions")
         #evaluator._predictions = load_obj(predictions_save_path)
         (evaluator._predictions, evaluator.focussed_comps, evaluator.related_comps, 
             evaluator.unrelated_comps,
-            evaluator.n_comps,evaluator.pred_bboxes_scores) = load_obj(predictions_save_path)
+            evaluator.n_comps,evaluator.pred_bboxes_scores,evaluator.unrelated_names,evaluator.focussed_names) = load_obj(predictions_save_path)
     else:
 
         num_warmup = min(5, total - 1)
@@ -181,7 +183,8 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
                     )
         # Save to pickle
         save_obj([evaluator._predictions,evaluator.focussed_comps,evaluator.related_comps,
-            evaluator.unrelated_comps,evaluator.n_comps,evaluator.pred_bboxes_scores], 
+            evaluator.unrelated_comps,evaluator.n_comps,evaluator.pred_bboxes_scores,evaluator.unrelated_names,
+            evaluator.focussed_names], 
             predictions_save_path)
 
         # Measure the time only for this worker (before the synchronization barrier)
@@ -200,18 +203,19 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
             )
         )
     results = evaluator.evaluate()
-    logger.info(f"LOFAR Evaluation metrics (for all values 0% is best, 100% is worst):")
-    logger.info(f"1. Pred. that fail to cover a single comp. source.")
-    logger.info(f"{results['bbox']['assoc_single_fail_fraction']:.2%}")
-    logger.info(f"2. Pred. that fail to cover all comp. of a " \
-            "multi-comp, source.")
-    logger.info(f"{results['bbox']['assoc_multi_fail_fraction']:.2%}")
-    logger.info(f"3. Pred. that include unassociated comp. for a single comp. source.")
-    logger.info(f"{results['bbox']['unassoc_single_fail_fraction']:.2%}")
-    logger.info(f"4. Pred. that include unassociated comp. for a " \
-            "multi-comp. source.")
-    logger.info(f"{results['bbox']['unassoc_multi_fail_fraction']:.2%}")
-    logger.info(f"Catalogue is {results['bbox']['correct_catalogue']} correct.")
+    if not isinstance(results, pd.DataFrame):
+        logger.info(f"LOFAR Evaluation metrics (for all values 0% is best, 100% is worst):")
+        logger.info(f"1. Pred. that fail to cover a single comp. source.")
+        logger.info(f"{results['bbox']['assoc_single_fail_fraction']:.2%}")
+        logger.info(f"2. Pred. that fail to cover all comp. of a " \
+                "multi-comp, source.")
+        logger.info(f"{results['bbox']['assoc_multi_fail_fraction']:.2%}")
+        logger.info(f"3. Pred. that include unassociated comp. for a single comp. source.")
+        logger.info(f"{results['bbox']['unassoc_single_fail_fraction']:.2%}")
+        logger.info(f"4. Pred. that include unassociated comp. for a " \
+                "multi-comp. source.")
+        logger.info(f"{results['bbox']['unassoc_multi_fail_fraction']:.2%}")
+        logger.info(f"Catalogue is {results['bbox']['correct_catalogue']} correct.")
 
     # An evaluator may return None when not in main process.
     # Replace it by an empty dict instead to make it easier for downstream code to handle
