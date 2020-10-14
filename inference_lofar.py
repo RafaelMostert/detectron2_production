@@ -99,7 +99,7 @@ for i, dic in enumerate(random.sample(inference_dict, 3)):
 # this works for the after the fact test eval
 # for train eval those things are somewhere within a model 
 # specifically a model that takes data and retuns a dict of losses
-pretrained_model_path = "/home/rafael/data/mostertrij/tridentnet/output/v4_all_withRot/model_final.pth"
+pretrained_model_path = "/data/mostertrij/tridentnet/output/v4_all_withRot/model_final.pth".replace('/data/mostertrij',start_dir)
 print("Load model:", pretrained_model_path)
 cfg.MODEL.WEIGHTS = os.path.join(pretrained_model_path)  # path to the model we just trained
 trainer = LOFARTrainer(cfg) 
@@ -112,5 +112,5 @@ print('Load LOFAR evaluator.')
 evaluator = LOFAREvaluator(d, cfg.OUTPUT_DIR, distributed=True, inference_only=True,
         kafka_to_lgm=False,component_save_name="predicted_component_catalogue")
 print('Start inference on dataset.')
-predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=False)
+predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=True)
 print('Done with inference.')
