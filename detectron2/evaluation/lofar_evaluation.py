@@ -197,40 +197,25 @@ class LOFAREvaluator(DatasetEvaluator):
                                 bbox[0],bbox[1],bbox[2],bbox[3])] 
                               for (x, y), (bboxes, scores) 
                               in zip(self.focussed_comps, self.pred_bboxes_scores)]
-        if debug:
-            print("pred_bboxes_scores after filtering out the focussed pixel")
-            print(pred_central_bboxes_scores[0])
+        
         # Record for which images we have no central bbox
         self.central_covered = [True if len(bboxes_scores) > 0 else False 
                                       for bboxes_scores in pred_central_bboxes_scores]
         
         # Take only the highest scoring bbox from this list of bboxes
+        max_score_threshold=0.05
+        self.second_best = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[1:4] 
+                                      if len(bboxes_scores) > 1 else [[[-1,-1,-1,-1],-99]] 
+                                      for bboxes_scores in pred_central_bboxes_scores]
         self.pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
                                       if len(bboxes_scores) > 0 else [[-1,-1,-1,-1],0] 
                                       for bboxes_scores in pred_central_bboxes_scores]
-        if debug:
-            print("pred_bboxes_scores after getting the highest scoring bbox")
-            print(self.pred_central_bboxes_scores[0])
+        max_scores =[score for bbox,score in self.pred_central_bboxes_scores] 
+        self.second_best = [[(box,score) for box,score in bboxes_scores if score >
+            max_score-max_score_threshold]
+                 for bboxes_scores,max_score in zip(self.second_best,max_scores)]
 
-        # Check if related source comps fall inside predicted central box
-        self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
-            bbox[0],bbox[1],bbox[2],bbox[3]) 
-                        for x,y in list(zip(comps[0],comps[1]))])
-                        for comps, (bbox, score) 
-                        in zip(self.related_comps, self.pred_central_bboxes_scores)]
-        assert len(self.unrelated_comps) == len(self.pred_central_bboxes_scores)
-
-        if debug:
-            print("comp_scores")
-            print(self.comp_scores[0])
-            print('len comp_scores ',len(self.comp_scores))
-
-        # Check if unrelated source comps fall inside predicted central box
-        self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
-            bbox[0],bbox[1],bbox[2],bbox[3]) 
-                    for x,y in zip(xs,ys)])
-                            for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
-                                self.pred_central_bboxes_scores)]
+        # Check which components fall within the predicted bbox with the highest score
         self.comp_inside_box = [[foc_name]+[name for x,y,name in zip(xs,ys,names) 
                                     if self.is_within(x*scale_factor,y*scale_factor,bbox[0],bbox[1],bbox[2],bbox[3])]
                             for (xs,ys),names, (bbox, score), foc_name in zip(self.unrelated_comps,
@@ -254,7 +239,8 @@ class LOFAREvaluator(DatasetEvaluator):
         comp_df = pd.DataFrame({"Source_Name":combined_names,"Component_Name":comp_names})
 
         print("Plot all predictions")
-        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
+        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))),
+                debug=False, show_second_best=True)
         print("Plot final predictions")
         self.plot_predictions("final_prediction_debug_images",cutout_list=indices, debug=False)
         
@@ -353,7 +339,8 @@ class LOFAREvaluator(DatasetEvaluator):
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
 
-    def plot_predictions(self, fail_dir_name, imsize=200,cutout_list=None, debug=False, lgm_to_kafka=False):
+    def plot_predictions(self, fail_dir_name, imsize=200,cutout_list=None, debug=False,
+            lgm_to_kafka=False, show_second_best=False):
         """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
         components so that they can be inspected to improve the box-draw-process"""
         if (self._dataset_name not in [ 'val','inference']) or cutout_list is None:
@@ -416,23 +403,30 @@ class LOFAREvaluator(DatasetEvaluator):
 
                 # Plot figure 
                 f, ax1 = plt.subplots(1,1, figsize=(10,8))
-                # Radio intensity + ground truth bboxes
+                # Radio intensity
                 ax1.imshow(im)
+                # Bounding box
                 ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
                         np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
-                #imsize-np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
+                if show_second_best:
+                    ax1.text(bbox[0],bbox[1],f"{score:.1%}")
+                    for tl, (bbox, score) in enumerate(self.second_best[i]):
+                        # Second best bounding box
+                        if tl==0: ax1.text(bbox[2],bbox[1],f"{score:.1%}")
+                        if tl==1: ax1.text(bbox[2],bbox[3],f"{score:.1%}")
+                        if tl==2: ax1.text(bbox[0],bbox[3],f"{score:.1%}")
+                        ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
+                                np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'gray')
+
+
                 ax1.set_title('Predicted bounding box')
                 # Plot component locations
                 ax1.plot(focus_l[0],focus_l[1],marker='s',color='r')
-                #ax1.plot(focus_l[0],imsize-focus_l[1],marker='s',color='r')
                 for x,y in zip(rel_l[0],rel_l[1]):
                     ax1.plot(x,y,marker='.',color='r')
-                    #ax1.plot(x,imsize-np.array(y),marker='.',color='r')
                 for x,y in zip(unrel_l[0],unrel_l[1]):
                     ax1.plot(x,y,marker='.',color='lime')
-                    #ax1.plot(x,imsize-np.array(y),marker='.',color='lime')
-
-
+                # Save and close plot
                 plt.savefig(dest, bbox_inches='tight')
                 plt.close()
 
