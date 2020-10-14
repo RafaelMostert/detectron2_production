@@ -16,6 +16,7 @@ from fvcore.common.file_io import PathManager
 from PIL import Image
 from tabulate import tabulate
 import matplotlib.pyplot as plt
+from astropy.table import Table
 
 from detectron2.data import MetadataCatalog
 from detectron2.utils import comm
@@ -44,7 +45,7 @@ class LOFAREvaluator(DatasetEvaluator):
     """
 
     def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False,
-            kafka_to_lgm=False):
+            kafka_to_lgm=False,component_save_name=None):
         """
         Args:
             dataset_name (str): name of the dataset
@@ -67,6 +68,7 @@ class LOFAREvaluator(DatasetEvaluator):
         self._predictions_json = os.path.join(output_dir, "predictions.json")
         self.inference_only=inference_only
         self.kafka_to_lgm = kafka_to_lgm
+        self.save_name = component_save_name
 
     def reset(self):
         self._predictions = []
@@ -237,6 +239,13 @@ class LOFAREvaluator(DatasetEvaluator):
                 combined_names.append(f"Combined_{i}")
                 comp_names.append(name)
         comp_df = pd.DataFrame({"Source_Name":combined_names,"Component_Name":comp_names})
+        # Save to hdf
+        hdf_path = os.path.join(self._output_dir,self.save_name + ".h5")
+        comp_df.to_hdf(hdf_path,'df')
+        # Save to fits
+        fits_path = os.path.join(self._output_dir,self.save_name + ".fits")
+        t = Table([combined_names,comp_names], names=('Source_Name', 'Component_Name'))
+        t.write(fits_path, format='fits')
 
         print("Plot all predictions")
         self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))),
