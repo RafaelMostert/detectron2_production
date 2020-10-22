@@ -348,7 +348,7 @@ class LOFAREvaluator(DatasetEvaluator):
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
         print("Plot predictions")
-        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
+        self.plot_predictions(f"all_prediction_debug_images_{self._dataset_name}",cutout_list=list(range(len(self.related_comps))), debug=False)
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
 
@@ -450,13 +450,13 @@ class LOFAREvaluator(DatasetEvaluator):
             ran = list(range(len(self.close_comp_scores)))
             fail_indices = [i for i, n_comp, unrelated in 
                 zip(ran, self.n_comps, self.close_comp_scores) if n_comp == 1 and unrelated > 0]
-            self.plot_predictions("single_overestimation", imsize=200,cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
+            self.plot_predictions(f"single_overestimation_{self._dataset_name}", imsize=200,cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
 
             # Collect single comp sources that fail to include their gt comp
             fail_indices = [i for i, n_comp, unrelated in 
                                      zip(ran, self.n_comps, self.close_comp_scores) 
                                      if n_comp > 1 and unrelated > 0]
-            self.plot_predictions("multi_overestimation", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
+            self.plot_predictions(f"multi_overestimation{self._dataset_name}", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
         return single_comp_fail_frac, multi_comp_binary_fail_frac
 
 
@@ -483,7 +483,7 @@ class LOFAREvaluator(DatasetEvaluator):
             ran = list(range(len(self.n_comps)))
             fail_indices = [i for i, n_comp,central_covered in zip(ran, self.n_comps, self.central_covered) 
                     if n_comp == 1 and not central_covered ]
-            self.plot_predictions("single_missing", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
+            self.plot_predictions(f"single_missing_{self._dataset_name}", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
             # Collect single comp sources that fail to include their gt comp
             fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.comp_scores) 
                     if ((n_comp > 1) and (n_comp != total)) ]
@@ -492,7 +492,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     self.close_comp_scores) 
                 if n_comp > 1 and ((central_covered and unrelated == 0 and n_comp > (related+1)) \
                         or (not central_covered))]
-            self.plot_predictions("multi_underestimation", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
+            self.plot_predictions(f"multi_underestimation_{self._dataset_name}", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
 
         return single_comp_fail_frac, multi_comp_binary_fail_frac
     

@@ -30,11 +30,11 @@ assert len(argv) > 1, "Insert path of configuration file when executing this scr
 cfg = get_cfg()
 cfg.merge_from_file(argv[1])
 if len(argv) == 3:
-    lgm_switch = bool(int(argv[2]))
-    if lgm_switch:
-        cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij","/data1/mostertrij")
-        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij","/data1/mostertrij")
-        cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij","/data1/mostertrij")
+    start_dir = argv[2]
+    print("Beginning of paths:", start_dir)
+    cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
+    cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
+    cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
 print(f"Loaded configuration file {argv[1]}")
 #ROTATION_ENABLED = bool(int(argv[2])) # 0 is False, 1 is True
 DATASET_PATH= cfg.DATASET_PATH
@@ -64,14 +64,14 @@ def get_lofar_dicts(annotation_filepath):
         if cfg.MODEL.PROPOSAL_GENERATOR:
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
         if cfg.INPUT.ROTATION_ENABLED:
-            if lgm_switch:
-                dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij","/data1/mostertrij")
+            if len(argv) == 3:
+                dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
             counter+=1 
         else:
             if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
-                if lgm_switch:
-                    dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij","/data1/mostertrij")
+                if len(argv) == 3:
+                    dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
                 new_data.append(dataset_dicts[i])
                 counter+=1
     print('len dataset is:', len(new_data), annotation_filepath)
