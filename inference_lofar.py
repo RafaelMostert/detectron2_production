@@ -61,6 +61,7 @@ def get_lofar_dicts(annotation_filepath):
 
         if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
             if len(argv) == 3:
+                dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data2/mostertrij",start_dir)
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
             counter+=1
@@ -80,6 +81,7 @@ lofar_metadata = MetadataCatalog.get(d)
 print("Sample and plot input data as sanity check")
 #"""
 for i, dic in enumerate(random.sample(inference_dict, 3)):
+    print(dic["file_name"])
     img = imread(dic["file_name"])
     visualizer = Visualizer(img[:, :, ::-1], metadata=lofar_metadata, scale=1)
     vis = visualizer.draw_dataset_dict(dic)
@@ -99,7 +101,7 @@ for i, dic in enumerate(random.sample(inference_dict, 3)):
 # this works for the after the fact test eval
 # for train eval those things are somewhere within a model 
 # specifically a model that takes data and retuns a dict of losses
-pretrained_model_path = "/data/mostertrij/tridentnet/output/v4_all_withRot/model_final.pth".replace('/data/mostertrij',start_dir)
+pretrained_model_path = "/data/mostertrij/tridentnet/output/v4_all_withRot/model_0059999.pth".replace('/data/mostertrij',start_dir)
 print("Load model:", pretrained_model_path)
 cfg.MODEL.WEIGHTS = os.path.join(pretrained_model_path)  # path to the model we just trained
 trainer = LOFARTrainer(cfg) 

@@ -75,6 +75,8 @@ class LOFAREvaluator(DatasetEvaluator):
         self.focussed_comps = []
         self.related_comps = []
         self.unrelated_comps = []
+        self.unrelated_names = []
+        self.focussed_names = []
         self.n_comps = []
         self.pred_bboxes_scores = []
 
