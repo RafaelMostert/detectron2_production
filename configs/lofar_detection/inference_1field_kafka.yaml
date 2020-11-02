@@ -1,0 +1,20 @@
+_BASE_: "base_lofar_fast_rcnn.yaml"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/inference_1field_kafka/"
+DATASET_PATH: "/data/mostertrij/data/frcnn_images/inference_1field_kafka/LGZ_COCOstyle/annotations/"
+DATASETS:
+  TRAIN: ("inference",)
+  TEST: ("inference",)
+  TRAIN_SIZE: 9999999999999999999
+MODEL:
+  ROI_HEADS:
+    SCORE_THRESH_TEST: 0.0
+    NMS_THRESH_TEST: 1.0
+INPUT:
+  ROTATION_ENABLED: False
+SOLVER:
+  #LR_SCHEDULER_NAME:  "WarmupCosineLR" 
+  STEPS: ()
+  MAX_ITER: 100000
+  CHECKPOINT_PERIOD: 20000
+TEST:
+  EVAL_PERIOD: 20000
