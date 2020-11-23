@@ -8,6 +8,7 @@ DATASETS:
   TEST: ("train","val","test")
   IMAGE_DIR: "/data/mostertrij/data/frcnn_images/"
 INPUT:
+  ROTATION_ENABLED: False
   SCALE_FACTOR: 1.0 #.5037593984962405 
   MIN_SIZE_TRAIN: (200,)
   MIN_SIZE_TEST: 200

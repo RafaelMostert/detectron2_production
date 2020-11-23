@@ -101,12 +101,14 @@ class LOFAREvaluator(DatasetEvaluator):
 
         self.focussed_names = [p["file_name"].split('/')[-1].split('_')[0]
                 for p in self._predictions]
-        self.focussed_comps = [[p["focussed_comp"][0][0], p["focussed_comp"][1][0]] 
-                for p in self._predictions]
-        self.related_comps = [p["related_comp"] if len(p["related_comp"])>0 else [[],[]] 
-                for p in self._predictions]
-        self.unrelated_comps = [p["unrelated_comp"] if len(p["unrelated_comp"])>0 else [[],[]] 
-                for p in self._predictions]
+        #print("prediction_shape", np.shape(self._predictions), self._predictions[0])
+        self.focussed_comps = [p["focussed_comp"] for p in self._predictions]
+        self.related_comps = [p["related_comp"] for p in self._predictions]
+        self.unrelated_comps = [p["unrelated_comp"] for p in self._predictions]
+        #self.related_comps = [p["related_comp"] if len(p["related_comp"])>0 else [[],[]] 
+        #        for p in self._predictions]
+        #self.unrelated_comps = [p["unrelated_comp"] if len(p["unrelated_comp"])>0 else [[],[]] 
+        #        for p in self._predictions]
         if self.inference_only:
             self.unrelated_names = [p["unrelated_names"] if len(p["unrelated_names"])>0 else [] 
                 for p in self._predictions]

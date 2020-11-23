@@ -65,13 +65,13 @@ def get_lofar_dicts(annotation_filepath):
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
         if cfg.INPUT.ROTATION_ENABLED:
             if len(argv) == 3:
-                dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
+                dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace('/data2/','/data/').replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
             counter+=1 
         else:
             if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
                 if len(argv) == 3:
-                    dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
+                    dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace('/data2/','/data/').replace("/data/mostertrij",start_dir)
                 new_data.append(dataset_dicts[i])
                 counter+=1
     print('len dataset is:', len(new_data), annotation_filepath)
@@ -89,8 +89,8 @@ lofar_metadata = MetadataCatalog.get("train")
 
 
 print("Sample and plot input data as sanity check")
-train_dict = get_lofar_dicts(os.path.join(DATASET_PATH,"VIA_json_train.pkl")) 
 """
+train_dict = get_lofar_dicts(os.path.join(DATASET_PATH,"VIA_json_train.pkl")) 
 for i, d in enumerate(random.sample(train_dict, 3)):
     img = imread(d["file_name"])
     visualizer = Visualizer(img[:, :, ::-1], metadata=lofar_metadata, scale=0.5)
