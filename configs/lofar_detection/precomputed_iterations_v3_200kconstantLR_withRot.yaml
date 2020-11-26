@@ -2,7 +2,7 @@ _BASE_: "base_lofar_fast_rcnn.yaml"
 OUTPUT_DIR: "/data/mostertrij/tridentnet/output/v3_precomputed_constantLR_withRot/"
 DATASETS:
   TRAIN: ("train",)
-  TEST: ("train","val")
+  TEST: ("train","val","test")
 INPUT:
   ROTATION_ENABLED: True
 SOLVER:
