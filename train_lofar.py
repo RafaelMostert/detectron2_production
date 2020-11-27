@@ -89,18 +89,19 @@ lofar_metadata = MetadataCatalog.get("train")
 
 
 print("Sample and plot input data as sanity check")
-"""
+#"""
 train_dict = get_lofar_dicts(os.path.join(DATASET_PATH,"VIA_json_train.pkl")) 
 for i, d in enumerate(random.sample(train_dict, 3)):
+#for i, d in enumerate(train_dict):
     img = imread(d["file_name"])
-    visualizer = Visualizer(img[:, :, ::-1], metadata=lofar_metadata, scale=0.5)
+    visualizer = Visualizer(img[:, :, ::-1], metadata=lofar_metadata, scale=2)
     vis = visualizer.draw_dataset_dict(d)
     a= vis.get_image()[:, :, ::-1]
     plt.figure(figsize=(10,10))
     plt.imshow(a)
-    plt.savefig(os.path.join(cfg.OUTPUT_DIR,f"random_input_example_for_sanity_check_{i}.jpg"))
+    plt.savefig(os.path.join(cfg.OUTPUT_DIR,f"sanity_check_{i}_{d['file_name'].split('/')[-1].replace('.png','')}.jpg"))
     plt.close()
-"""
+#"""
 
 
 # # Train mode

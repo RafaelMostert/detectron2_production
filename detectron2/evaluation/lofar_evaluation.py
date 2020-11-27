@@ -287,6 +287,7 @@ class LOFAREvaluator(DatasetEvaluator):
             5. The prediction score is lower than x
         
         """
+        debug=True
         print("Evaluate predictions")
         if debug:
             #Check ground truth and prediction values of first item
@@ -296,8 +297,8 @@ class LOFAREvaluator(DatasetEvaluator):
             #print(np.shape(self.focussed_comps), np.shape(self.related_comps),
             #        np.shape(self.unrelated_comps), np.shape(self.n_comps))
             print("ncomp",self.n_comps)
-            print("pred_bboxes_scores")
-            print(self.pred_bboxes_scores[0])
+            #print("pred_bboxes_scores")
+            #print(self.pred_bboxes_scores[0])
 
         # Count number of components in dataset
         # Retrieve number of components per central source
@@ -349,6 +350,7 @@ class LOFAREvaluator(DatasetEvaluator):
                             for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
                                 self.pred_central_bboxes_scores)]
         debug=self.debug
+        debug=True
         # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
         includes_associated_fail_fraction = self._check_if_pred_central_bbox_misses_comp(debug=debug)
 
@@ -357,7 +359,7 @@ class LOFAREvaluator(DatasetEvaluator):
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
         print("Plot predictions")
-        #self.plot_predictions(f"all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
+        self.plot_predictions(f"all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
 
@@ -427,15 +429,19 @@ class LOFAREvaluator(DatasetEvaluator):
                 # Bounding box
                 ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
                         np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
+                if debug and dest.endswith('ILTJ110530.36+465055.8_radio_DR2_rotated0deg.png'):
+                    print('bbox plotted in debug image:', bbox)
+                    print('predicted bboxes and scores:', self.pred_bboxes_scores[i])
+
                 if show_second_best:
                     ax1.text(bbox[0],bbox[1],f"{score:.1%}")
-                    for tl, (bbox, score) in enumerate(self.second_best[i]):
+                    for tl, (bbox2, score) in enumerate(self.second_best[i]):
                         # Second best bounding box
-                        if tl==0: ax1.text(bbox[2],bbox[1],f"{score:.1%}")
-                        if tl==1: ax1.text(bbox[2],bbox[3],f"{score:.1%}")
-                        if tl==2: ax1.text(bbox[0],bbox[3],f"{score:.1%}")
-                        ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
-                                np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'gray')
+                        if tl==0: ax1.text(bbox2[2],bbox2[1],f"{score:.1%}")
+                        if tl==1: ax1.text(bbox2[2],bbox2[3],f"{score:.1%}")
+                        if tl==2: ax1.text(bbox2[0],bbox2[3],f"{score:.1%}")
+                        ax1.plot([bbox2[0],bbox2[2],bbox2[2],bbox2[0],bbox2[0]],
+                                np.array([bbox2[1],bbox2[1],bbox2[3],bbox2[3],bbox2[1]]),'gray')
 
 
                 if debug:
@@ -454,9 +460,9 @@ class LOFAREvaluator(DatasetEvaluator):
                     ax1.plot(x,y,marker='.',markersize=8,color='r')
                 for x,y in zip(unrel_l[0],unrel_l[1]):
                     ax1.plot(x,y,marker='.',markersize=8,color='lime')
-                if not show_second_best:
-                    ax1.axes.xaxis.set_visible(False)
-                    ax1.axes.yaxis.set_visible(False)    
+                #if not show_second_best:
+                #    ax1.axes.xaxis.set_visible(False)
+                #    ax1.axes.yaxis.set_visible(False)    
                 ax1.set_xlim(0,200)
                 ax1.set_ylim(200,0)
                 # Save and close plot
