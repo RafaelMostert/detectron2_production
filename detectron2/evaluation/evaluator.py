@@ -155,6 +155,10 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
         with inference_context(model), torch.no_grad():
             for idx, inputs in enumerate(data_loader):
                 # We only need to evaluate the unrotated images
+                if inputs[0]['file_name'].endswith('ILTJ110530.36+465055.8_radio_DR2_rotated0deg.png'):
+                    print('input filename')
+                    print(inputs[0]['proposals'])
+
                 if only_zero_rot and not inputs[0]['file_name'].endswith('_rotated0deg.png'):
                     continue
                 if idx == num_warmup:
@@ -163,6 +167,10 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
 
                 start_compute_time = time.perf_counter()
                 outputs = model(inputs)
+                if inputs[0]['file_name'].endswith('ILTJ110530.36+465055.8_radio_DR2_rotated0deg.png'):
+                    print('output filename')
+                    print(outputs)
+
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
                 total_compute_time += time.perf_counter() - start_compute_time
