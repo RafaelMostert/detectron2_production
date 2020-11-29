@@ -398,9 +398,9 @@ class FastRCNNOutputLayers(nn.Module):
         self.bbox_pred = Linear(input_size, num_bbox_reg_classes * box_dim)
 
         nn.init.normal_(self.cls_score.weight, std=0.01)
-        #nn.init.normal_(self.bbox_pred.weight, std=0.001)
+        nn.init.normal_(self.bbox_pred.weight, std=0.001)
         # DEBUG Attempt to remove noise introduced to proposed bboxes in fastrcnn mode
-        nn.init.zeros_(self.bbox_pred.weight)
+        #nn.init.zeros_(self.bbox_pred.weight)
         for l in [self.cls_score, self.bbox_pred]:
             nn.init.constant_(l.bias, 0)
 
