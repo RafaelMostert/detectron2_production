@@ -398,7 +398,9 @@ class FastRCNNOutputLayers(nn.Module):
         self.bbox_pred = Linear(input_size, num_bbox_reg_classes * box_dim)
 
         nn.init.normal_(self.cls_score.weight, std=0.01)
-        nn.init.normal_(self.bbox_pred.weight, std=0.001)
+        #nn.init.normal_(self.bbox_pred.weight, std=0.001)
+        # DEBUG Attempt to remove noise introduced to proposed bboxes in fastrcnn mode
+        nn.init.zeros_(self.bbox_pred.weight)
         for l in [self.cls_score, self.bbox_pred]:
             nn.init.constant_(l.bias, 0)
 
@@ -446,6 +448,7 @@ class FastRCNNOutputLayers(nn.Module):
             x = torch.flatten(x, start_dim=1)
         scores = self.cls_score(x)
         proposal_deltas = self.bbox_pred(x)
+        #print("debug print, proposal_deltas", proposal_deltas)
         return scores, proposal_deltas
 
     # TODO: move the implementation to this class.
@@ -482,7 +485,9 @@ class FastRCNNOutputLayers(nn.Module):
             list[Instances]: same as `fast_rcnn_inference`.
             list[Tensor]: same as `fast_rcnn_inference`.
         """
+        #print('debug print box_predictor.inference pred, prop', predictions[1], proposals[0])
         boxes = self.predict_boxes(predictions, proposals)
+        #print("debug print, boxes", boxes)
         scores = self.predict_probs(predictions, proposals)
         image_shapes = [x.image_size for x in proposals]
         return fast_rcnn_inference(
@@ -513,9 +518,13 @@ class FastRCNNOutputLayers(nn.Module):
         proposal_boxes = [p.proposal_boxes for p in proposals]
         proposal_boxes = proposal_boxes[0].cat(proposal_boxes).tensor
         N, B = proposal_boxes.shape
-        predict_boxes = self.box2box_transform.apply_deltas(
-            proposal_deltas, proposal_boxes
-        )  # Nx(KxB)
+
+        # DEBUG commented out below to see if we can remove deltas
+        #predict_boxes = self.box2box_transform.apply_deltas(
+        #    proposal_deltas, proposal_boxes
+        #)  # Nx(KxB)
+        predict_boxes = proposal_boxes
+        # END DEBUG
 
         K = predict_boxes.shape[1] // B
         if K > 1:
@@ -549,9 +558,12 @@ class FastRCNNOutputLayers(nn.Module):
         num_prop_per_image = [len(p) for p in proposals]
         proposal_boxes = [p.proposal_boxes for p in proposals]
         proposal_boxes = proposal_boxes[0].cat(proposal_boxes).tensor
-        predict_boxes = self.box2box_transform.apply_deltas(
-            proposal_deltas, proposal_boxes
-        )  # Nx(KxB)
+        # DEBUG commented out below to see if we can remove deltas
+        #predict_boxes = self.box2box_transform.apply_deltas(
+        #    proposal_deltas, proposal_boxes
+        #)  # Nx(KxB)
+        predict_boxes = proposal_boxes
+        # END DEBUG
         return predict_boxes.split(num_prop_per_image)
 
     def predict_probs(self, predictions, proposals):

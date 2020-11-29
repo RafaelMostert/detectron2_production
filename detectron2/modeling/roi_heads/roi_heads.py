@@ -672,14 +672,11 @@ class StandardROIHeads(ROIHeads):
             return proposals, losses
         else:
             pred_instances = self._forward_box(features, proposals)
-            print("first proposals as they leave forward_box")
-            print(proposals[0])
-            print("feature length:", len(features))
             # During inference cascaded prediction is used: the mask and keypoints heads are only
             # applied to the top scoring box detections.
+            #print("first prediction instances as they leave forward_box")
+            #print(pred_instances)
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
-            print("first prediction instances as they leave forward_with_given_boxes")
-            print(pred_instances[0])
             return pred_instances, {}
 
     def forward_with_given_boxes(
@@ -747,6 +744,8 @@ class StandardROIHeads(ROIHeads):
             return losses
         else:
             pred_instances, _ = self.box_predictor.inference(predictions, proposals)
+            #print("prediction boxes as they leave box_predictor inference")
+            #print(pred_instances)
             return pred_instances
 
     def _forward_mask(

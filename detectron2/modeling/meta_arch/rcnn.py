@@ -203,10 +203,18 @@ class GeneralizedRCNN(nn.Module):
                 assert "proposals" in batched_inputs[0]
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
 
+            #print("apparently detected_instances is none")
+            #print("debug print, proposals as they enter the roi_heads:")
+            #print(proposals[0])
             results, _ = self.roi_heads(images, features, proposals, None)
+            #print("results 1:", results)
         else:
+            #print("apparently detected_instances is NOT none")
+            #print("debug print, debug instances as they enter the roi_heads:")
+            #print(detected_instances)
             detected_instances = [x.to(self.device) for x in detected_instances]
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
+            #print("debug print, after roi_heads.forward_with_given", results)
 
         if do_postprocess:
             return GeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)

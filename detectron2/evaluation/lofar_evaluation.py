@@ -287,7 +287,6 @@ class LOFAREvaluator(DatasetEvaluator):
             5. The prediction score is lower than x
         
         """
-        debug=True
         print("Evaluate predictions")
         if debug:
             #Check ground truth and prediction values of first item
