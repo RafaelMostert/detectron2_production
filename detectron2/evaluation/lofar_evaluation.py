@@ -358,7 +358,8 @@ class LOFAREvaluator(DatasetEvaluator):
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
         print("Plot predictions")
-        self.plot_predictions(f"all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
+        if debug:
+            self.plot_predictions(f"all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
 
@@ -366,8 +367,8 @@ class LOFAREvaluator(DatasetEvaluator):
             lgm_to_kafka=False, show_second_best=False):
         """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
         components so that they can be inspected to improve the box-draw-process"""
-        if (self._dataset_name not in [ 'test', 'val','inference']) or cutout_list is None:
-            return
+        #if (self._dataset_name not in [ 'test', 'val','inference']) or cutout_list is None:
+        #    return
         from cv2 import imread
 
         print("Inside plot_predictions, outputdir is:", self._output_dir)
