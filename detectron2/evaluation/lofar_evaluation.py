@@ -258,13 +258,11 @@ class LOFAREvaluator(DatasetEvaluator):
         t = Table([combined_names,comp_names], names=('Source_Name', 'Component_Name'))
         t.write(fits_path, format='fits')
 
-        '''
-        print("Plot all predictions")
-        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))),
+        print("Plot first 1000 predictions (predictions not aggregated yet)")
+        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(np.array(self.related_comps)[:1000]))),
                 debug=False, show_second_best=True)
-        print("Plot final predictions")
-        self.plot_predictions("final_prediction_debug_images",cutout_list=indices, debug=False)
-        '''
+        print("Plot first 1000 final predictions: components should only appear in a single bounding box")
+        self.plot_predictions("final_prediction_debug_images",cutout_list=np.array(indices)[:1000], debug=False)
         
         return comp_df
 
@@ -349,7 +347,6 @@ class LOFAREvaluator(DatasetEvaluator):
                             for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
                                 self.pred_central_bboxes_scores)]
         debug=self.debug
-        debug=True
         # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
         includes_associated_fail_fraction = self._check_if_pred_central_bbox_misses_comp(debug=debug)
 

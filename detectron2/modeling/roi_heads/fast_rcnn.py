@@ -237,7 +237,8 @@ class FastRCNNOutputs:
             scalar Tensor
         """
         if self._no_instances:
-            return 0.0 * self.pred_proposal_deltas.sum()
+            print("DEBUG print, we encounter no instances, pred_proposal_deltas is 0")
+            return 0.0 #* self.pred_proposal_deltas.sum()
 
         box_dim = self.gt_boxes.tensor.size(1)  # 4 or 5
         cls_agnostic_bbox_reg = self.pred_proposal_deltas.size(1) == box_dim
@@ -294,7 +295,10 @@ class FastRCNNOutputs:
         # means that the single example in minibatch (1) and each of the 100 examples
         # in minibatch (2) are given equal influence.
         loss_box_reg = loss_box_reg / self.gt_classes.numel()
-        return loss_box_reg
+        ####################### DEBUG hack to see if we are better of without loss box reg 
+        #return loss_box_reg
+        return 0.0
+        ###################### end of debug hack
 
     def _predict_boxes(self):
         """
