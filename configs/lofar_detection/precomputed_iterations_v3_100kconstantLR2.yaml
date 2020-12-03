@@ -1,0 +1,15 @@
+_BASE_: "base_lofar_fast_rcnn.yaml"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/v3_precomputed_constantLR2/"
+DATASETS:
+  TRAIN: ("train",)
+  TEST: ("train","val","test")
+INPUT:
+  ROTATION_ENABLED: False
+SOLVER:
+  #LR_SCHEDULER_NAME:  "WarmupCosineLR" 
+  STEPS: ()
+  MAX_ITER: 2500 
+  CHECKPOINT_PERIOD: 20000
+TEST:
+  EVAL_PERIOD: 20000
+  #EXTRA_EVAL: [1,500,1000,2500,10000]
