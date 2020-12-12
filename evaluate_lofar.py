@@ -57,6 +57,7 @@ print(f"Rotation enabled: {cfg.INPUT.ROTATION_ENABLED}")
 print(f"Precomputed bboxes: {cfg.MODEL.PROPOSAL_GENERATOR}")
 print(f"Output path: {cfg.OUTPUT_DIR}")
 print(f"Attempt to load training data from: {DATASET_PATH}")
+print("Pretrained model path:", pretrained_model_path)
 os.makedirs(cfg.OUTPUT_DIR,exist_ok=True)
 
 
@@ -79,7 +80,7 @@ def get_lofar_dicts(annotation_filepath):
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
 
         if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
-            if len(argv) == 3:
+            if len(argv) == 4:
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data2/mostertrij",start_dir)
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
@@ -111,11 +112,13 @@ trainer = LOFARTrainer(cfg)
 os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
 trainer.resume_or_load(resume=True)
 
-print('Load inference loader.')
-inference_loader = build_detection_test_loader(cfg, d)
-print('Load LOFAR evaluator.')
-evaluator = LOFAREvaluator(d, cfg.OUTPUT_DIR, distributed=True, inference_only=True,
-        kafka_to_lgm=False,component_save_name="bare_predicted_component_catalogue")
-print('Start inference on dataset to get evaluation.')
-predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=True)
+for d in ["train", "val", "test"]:
+    print(f"For {d} set:")
+    print('Load inference loader.')
+    inference_loader = build_detection_test_loader(cfg, d)
+    print('Load LOFAR evaluator.')
+    evaluator = LOFAREvaluator(d, cfg.OUTPUT_DIR, distributed=True, inference_only=False,
+            save_predictions=True, kafka_to_lgm=False,component_save_name="bare_predicted_component_catalogue")
+    print('Start inference on dataset to get evaluation.')
+    predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=True)
 print("All done.")

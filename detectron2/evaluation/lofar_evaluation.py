@@ -46,7 +46,7 @@ class LOFAREvaluator(DatasetEvaluator):
     """
 
     def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False,
-            kafka_to_lgm=False,component_save_name=None,debug=False):
+            kafka_to_lgm=False,component_save_name=None,debug=False, save_predictions=False):
         """
         Args:
             dataset_name (str): name of the dataset
@@ -70,6 +70,7 @@ class LOFAREvaluator(DatasetEvaluator):
         self.inference_only=inference_only
         self.kafka_to_lgm = kafka_to_lgm
         self.save_name = component_save_name
+        self.save_predictions = save_predictions
         self.debug = debug
 
     def reset(self):
@@ -355,7 +356,7 @@ class LOFAREvaluator(DatasetEvaluator):
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
         print("Plot predictions")
-        if debug:
+        if debug or self.save_predictions:
             self.plot_predictions(f"all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
@@ -482,7 +483,7 @@ class LOFAREvaluator(DatasetEvaluator):
         #                            if n_comp > 1]
         multi_comp_binary_fail_frac = np.sum(multi_comp_binary_fail)/len(multi_comp_binary_fail)
         
-        if debug:
+        if debug or self.save_predictions:
             # Collect single comp sources that includ unassociated comps
             ran = list(range(len(self.close_comp_scores)))
             fail_indices = [i for i, n_comp, unrelated in 
@@ -515,7 +516,7 @@ class LOFAREvaluator(DatasetEvaluator):
                 if n_comp > 1]
         multi_comp_binary_fail_frac = np.sum(multi_comp_binary_fail)/len(multi_comp_binary_fail)
         
-        if debug:
+        if debug or self.save_predictions:
             # Collect single comp sources that fail to include their gt comp
             ran = list(range(len(self.n_comps)))
             fail_indices = [i for i, n_comp,central_covered in zip(ran, self.n_comps, self.central_covered) 
