@@ -113,9 +113,8 @@ class LOFAREvaluator(DatasetEvaluator):
         self.unrelated_comps = [p["unrelated_comp"] for p in self._predictions]
         self.related_unresolved = [p["related_unresolved"] for p in self._predictions]
         self.unrelated_unresolved = [p["unrelated_unresolved"] for p in self._predictions]
-        print("related unresolved:", self.related_unresolved[0])
-        print("unrelated unresolved:", self.unrelated_unresolved[0])
-        sdfsdf
+        #print("related unresolved:", self.related_unresolved[0])
+        #print("unrelated unresolved:", self.unrelated_unresolved[0])
 
         if self.inference_only:
             self.unrelated_names = [p["unrelated_names"] if len(p["unrelated_names"])>0 else [] 
