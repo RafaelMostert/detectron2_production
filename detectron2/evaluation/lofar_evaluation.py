@@ -46,6 +46,7 @@ class LOFAREvaluator(DatasetEvaluator):
     """
 
     def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False,
+            remove_unresolved=False,
             kafka_to_lgm=False,component_save_name=None,debug=False, save_predictions=False):
         """
         Args:
@@ -71,6 +72,7 @@ class LOFAREvaluator(DatasetEvaluator):
         self.kafka_to_lgm = kafka_to_lgm
         self.save_name = component_save_name
         self.save_predictions = save_predictions
+        self.remove_unresolved = remove_unresolved
         self.debug = debug
 
     def reset(self):
@@ -111,11 +113,11 @@ class LOFAREvaluator(DatasetEvaluator):
         self.focussed_comps = [p["focussed_comp"] for p in self._predictions]
         self.related_comps = [p["related_comp"] for p in self._predictions]
         self.unrelated_comps = [p["unrelated_comp"] for p in self._predictions]
-        self.related_unresolved = [p["related_unresolved"] for p in self._predictions]
-        self.unrelated_unresolved = [p["unrelated_unresolved"] for p in self._predictions]
-        print("related unresolved:", self.related_unresolved[0])
-        print("unrelated unresolved:", self.unrelated_unresolved[0])
-        sdfsdf
+        if self.remove_unresolved:
+            self.related_unresolved = [p["related_unresolved"] for p in self._predictions]
+            self.unrelated_unresolved = [p["unrelated_unresolved"] for p in self._predictions]
+            #print("related unresolved:", self.related_unresolved[0])
+            #print("unrelated unresolved:", self.unrelated_unresolved[0])
 
         if self.inference_only:
             self.unrelated_names = [p["unrelated_names"] if len(p["unrelated_names"])>0 else [] 
@@ -331,29 +333,55 @@ class LOFAREvaluator(DatasetEvaluator):
         self.pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
                                       if len(bboxes_scores) > 0 else [[-1,-1,-1,-1],0] 
                                       for bboxes_scores in pred_central_bboxes_scores]
+        assert len(self.unrelated_comps) == len(self.pred_central_bboxes_scores)
         if debug:
             print("pred_bboxes_scores after getting the highest scoring bbox")
             print(self.pred_central_bboxes_scores[0])
 
         # Check if related source comps fall inside predicted central box
-        self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
-            bbox[0],bbox[1],bbox[2],bbox[3]) 
-                        for x,y in list(zip(comps[0],comps[1]))])
-                        for comps, (bbox, score) 
-                        in zip(self.related_comps, self.pred_central_bboxes_scores)]
-        assert len(self.unrelated_comps) == len(self.pred_central_bboxes_scores)
+         if remove_unresolved:
 
-        if debug:
-            print("comp_scores")
-            print(self.comp_scores[0])
-            print('len comp_scores ',len(self.comp_scores))
+            related_unresolved = reinsert_unresolved_for_triplets(related_comps, related_unresolved,
+                    central_bboxes, focussed_comps, related_resolved_comps, source_names, 
+                    segmentation_dir,
+                    imsize=imsize)
+            unrelated_unresolved = reinsert_unresolved_for_triplets(unrelated_comps,
+                    unrelated_unresolved, central_bboxes, focussed_comps, related_resolved_comps,
+                    source_names,
+                    segmentation_dir, imsize=imsize)
 
-        # Check if unrelated source comps fall inside predicted central box
-        self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
-            bbox[0],bbox[1],bbox[2],bbox[3]) 
-                    for x,y in zip(xs,ys)])
-                            for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
-                                self.pred_central_bboxes_scores)]
+             self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
+                 bbox[0],bbox[1],bbox[2],bbox[3]) 
+                             for x,y in list(zip(comps[0],comps[1]))])
+                             for comps, (bbox, score) 
+                             in zip(self.related_comps, self.pred_central_bboxes_scores)]
+
+             # Check if unrelated source comps fall inside predicted central box
+             self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
+                 bbox[0],bbox[1],bbox[2],bbox[3]) 
+                         for x,y in zip(xs,ys)])
+                                for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
+                                    self.pred_central_bboxes_scores)]
+         else:
+  
+             self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
+                 bbox[0],bbox[1],bbox[2],bbox[3]) 
+                             for x,y in list(zip(comps[0],comps[1]))])
+                             for comps, (bbox, score) 
+                             in zip(self.related_comps, self.pred_central_bboxes_scores)]
+  
+             if debug:
+                 print("comp_scores")
+                 print(self.comp_scores[0])
+                 print('len comp_scores ',len(self.comp_scores))
+  
+             # Check if unrelated source comps fall inside predicted central box
+             self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
+                 bbox[0],bbox[1],bbox[2],bbox[3]) 
+                         for x,y in zip(xs,ys)])
+                                for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
+                                    self.pred_central_bboxes_scores)]
+
         debug=self.debug
         # 1&2. "Predicted central bbox not existing or misses a number of components" can now be checked
         includes_associated_fail_fraction = self._check_if_pred_central_bbox_misses_comp(debug=debug)
