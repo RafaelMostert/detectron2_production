@@ -118,6 +118,7 @@ for d in ["train", "val", "test"]:
     inference_loader = build_detection_test_loader(cfg, d)
     print('Load LOFAR evaluator.')
     evaluator = LOFAREvaluator(d, cfg.OUTPUT_DIR, distributed=True, inference_only=False,
+            remove_unresolved=cfg.TEST.REMOVE_UNRESOLVED,
             save_predictions=True, kafka_to_lgm=False,component_save_name="bare_predicted_component_catalogue")
     print('Start inference on dataset to get evaluation.')
     predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=True)
