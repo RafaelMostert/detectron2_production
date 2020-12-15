@@ -712,7 +712,8 @@ class LOFARTrainer(SimpleTrainer):
 
         def test_and_save_results():
             self._last_eval_results = self.test(self.cfg, self.model,
-                    evaluators=[LOFAREvaluator(t, cfg.OUTPUT_DIR)
+                    evaluators=[LOFAREvaluator(t, cfg.OUTPUT_DIR,
+                        remove_unresolved=cfg.TEST.REMOVE_UNRESOLVED)
                         for t in self.cfg.DATASETS.TEST])
             return self._last_eval_results
 

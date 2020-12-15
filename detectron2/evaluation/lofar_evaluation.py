@@ -466,7 +466,7 @@ class LOFAREvaluator(DatasetEvaluator):
             print(self.pred_central_bboxes_scores[0])
 
         # Check if related source comps fall inside predicted central box
-        if remove_unresolved:
+        if self.remove_unresolved:
             self.reinsert_unresolved_for_triplets()
 
             self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,

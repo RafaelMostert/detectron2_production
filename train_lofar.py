@@ -13,7 +13,7 @@ from detectron2.utils.visualizer import Visualizer, ColorMode
 from detectron2.data import DatasetCatalog, MetadataCatalog, build_detection_test_loader
 from detectron2.structures import BoxMode
 from detectron2.engine import DefaultPredictor, LOFARTrainer
-from detectron2.evaluation import COCOEvaluator, inference_on_dataset, LOFAREvaluator
+from detectron2.evaluation import COCOEvaluator, inference_on_dataset
 
 # import some common libraries
 import numpy as np
