@@ -47,6 +47,7 @@ class LOFAREvaluator(DatasetEvaluator):
 
     def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False,
             remove_unresolved=False,
+            segmentation_dir='/data1/mostertrij/data/cache/segmentation_maps',
             kafka_to_lgm=False,component_save_name=None,debug=False, save_predictions=False):
         """
         Args:
@@ -73,6 +74,7 @@ class LOFAREvaluator(DatasetEvaluator):
         self.save_name = component_save_name
         self.save_predictions = save_predictions
         self.remove_unresolved = remove_unresolved
+        self.segmentation_dir = segmentation_dir
         self.debug = debug
 
     def reset(self):
@@ -277,6 +279,133 @@ class LOFAREvaluator(DatasetEvaluator):
         return comp_df
 
 
+def reinsert_unresolved_for_triplets(self, imsize=200, debug=False):
+    """Given a list of unresolved objects, tries to reinsert them if sensible"""
+
+    # Check if any unresolved components are inside predicted bbox.
+    unresolved_in_predicted_bboxes = [np.any([is_within(x,y,
+        bbox[0],bbox[1],bbox[2],bbox[3])
+                for unresolved, x,y in zip(unresolved_list, xs,ys) if unresolved])
+                                  for (xs,ys), unresolved_list, (bbox,score) 
+                                  in zip(reinstate_components, unresolved_per_cutout,
+                                      self.pred_central_bboxes_scores)]
+
+    # Check which resolved components are inside predicted bbox
+    related_resolved_in_predicted_bboxes = [np.array([xs,ys])[is_within(x,y,
+        bbox[0],bbox[1],bbox[2],bbox[3]) and not unresolved
+                for unresolved, x,y in zip(unresolved_list, xs,ys) if unresolved]
+                                  for (xs,ys), unresolved_list, (bbox,score) 
+                                  in zip(self.related_comps, self.related_unresolved,
+                                      self.pred_central_bboxes_scores)]
+    unrelated_resolved_in_predicted_bboxes = [np.array([xs,ys])[is_within(x,y,
+        bbox[0],bbox[1],bbox[2],bbox[3]) and not unresolved
+                for unresolved, x,y in zip(unresolved_list, xs,ys) if unresolved]
+                                  for (xs,ys), unresolved_list, (bbox,score) 
+                                  in zip(self.unrelated_comps, self.unrelated_unresolved,
+                                      self.pred_central_bboxes_scores)]
+
+    # If so proceed with following actions.
+    segmentation_paths = [os.path.join(self.segmentation_dir, f"{s}_{imsize}.pkl")
+            for s in self.focussed_names]
+    new_related_unresolved, new_unrelated_unresolved = [], []
+    for t, (action_needed,  related_comp, unrelated_comp) in \
+                enumerate(zip(unresolved_in_predicted_bboxes,
+                        related_resolved_in_predicted_bboxes,
+                        unrelated_resolved_in_predicted_bboxes)):
+        if action_needed:
+
+            # Load segmentation map per cutout
+            with open(segmentation_paths[t], 'rb') as f:
+                segmented_cutout = pickle.load(f)
+
+            # Given a segmentation map
+            outlines = segmented_cutout.outline_segments()
+
+            # Debug plot outlines
+            if debug:
+                plt.imshow(outlines)
+                plt.show()
+
+            # Find segmentation islands corresponding to radio components
+
+            pixel_xs = [self.focussed_comps[t][0]]+related_comp[0]+unrelated_comp[0]
+            pixel_ys = [self.focussed_comps[t][1]]+related_comp[1]+unrelated_comp[1]
+            if debug:
+                print("pixel_xs", pixel_xs)
+                print("pixel_ys", pixel_ys)
+            try:
+                labels = [segmented_cutout.data[int(round(y)), int(round(x))] for x,y in
+                    zip(pixel_xs, pixel_ys)]
+            except:
+                if debug:
+                    print("no label found")
+                continue
+            labels = [l for l in labels if not l == 0]
+            labels = np.array(labels)-1 # labels start at 1 as 0 is background
+
+            # If no labels are found, enlarge the search radius
+            labels2 = labels
+            r = 3 # Search radius
+            if labels.size != len(pixel_xs):
+                labels = list(set(flatten_yield([
+                    segmented_cutout.data[int(round(y))-r:int(round(y))+r,
+                        int(round(x))-r:int(round(x))+r] for x,y in \
+                    zip(pixel_xs, pixel_ys)])))
+                labels = [l for l in labels if not l == 0]
+                labels = np.array(labels)-1 # labels start at 1 as 0 is background
+
+            if debug:
+                print("labels:", labels)
+            # Get bounding boxes for segments
+            bboxes = [segmented_cutout.segments[l].bbox for l in labels]
+
+            # Get all non-background points from the segmentation outlines
+            points = []
+            for b in bboxes:
+                outline = outlines[b.iymin:b.iymax,b.ixmin:b.ixmax]
+                for i, rows in enumerate(outline):
+                    for j,el in enumerate(rows):
+                        if el > 0:
+                            points.append([b.iymin+i,b.ixmin+j])
+            points = np.array(points)
+            if debug:
+                plt.scatter(*list(zip(*points)))
+                plt.show()
+
+            # Create convex hull from points (removes inner points)
+            hull = ConvexHull( points )
+            # Create matplotlib Path object from convexhull vertices
+            hull_path = Path( points[hull.vertices] )
+            # This allows us to query whether a point is contained by our convex hull
+            new_rel_unresolved_list = [False for _ in range(len(self.related_unresolved[t]))]
+            new_unrel_unresolved_list = [False for _ in range(len(self.unrelated_unresolved[t]))]
+            for i, (x,y, unresolved) in enumerate(zip(self.related_comps[t][0],
+                self.related_comps[t][1], self.related_unresolved[t])):
+                if unresolved:
+                    should_be_reinstated = hull_path.contains_point((y,x))
+                    if debug:
+                        print(f"Does our predicted convex hull contain point {x},{y}?")
+                        print(should_be_reinstated)
+                    if not should_be_reinstated:
+                        new_rel_unresolved_list[i] =  True
+            for i, (x,y, unresolved) in enumerate(zip(self.unrelated_comps[t][0],
+                self.unrelated_comps[t][1], self.unrelated_unresolved[t])):
+                if unresolved:
+                    should_be_reinstated = hull_path.contains_point((y,x))
+                    if debug:
+                        print(f"Does our predicted convex hull contain point {x},{y}?")
+                        print(should_be_reinstated)
+                    if not should_be_reinstated:
+                        new_unrel_unresolved_list[i] =  True
+            new_rel_unresolved_per_cutout.append(new_rel_unresolved_list)
+            new_unrel_unresolved_per_cutout.append(new_unrel_unresolved_list)
+        else:
+            new_rel_unresolved_per_cutout.append(self.related_unresolved[t])
+            new_unrel_unresolved_per_cutout.append(self.unrelated_unresolved[t])
+    self.related_unresolved = new_rel_unresolved_per_cutout
+    self.unrelated_unresolved = new_unrel_unresolved_per_cutout
+    
+
     def _evaluate_predictions_on_lofar_score(self, scale_factor=1, debug=False, imsize=200):
         """ 
         Evaluate the results using our LOFAR appropriate score.
@@ -307,9 +436,6 @@ class LOFAREvaluator(DatasetEvaluator):
             #print("pred_bboxes_scores")
             #print(self.pred_bboxes_scores[0])
 
-        # Count number of components in dataset
-        # Retrieve number of components per central source
-        #comps = [counts[comp_name_to_source_name_dict[source_name]] for source_name in source_names]
         
         # Get number of single and multi comp sources
         self.single_comps = sum([1 if n==1 else 0 for n in self.n_comps])
@@ -339,44 +465,38 @@ class LOFAREvaluator(DatasetEvaluator):
             print(self.pred_central_bboxes_scores[0])
 
         # Check if related source comps fall inside predicted central box
-         if remove_unresolved:
+        if remove_unresolved:
+            self.reinsert_unresolved_for_triplets()
 
-            related_unresolved = reinsert_unresolved_for_triplets(related_comps, related_unresolved,
-                    central_bboxes, focussed_comps, related_resolved_comps, source_names, 
-                    segmentation_dir,
-                    imsize=imsize)
-            unrelated_unresolved = reinsert_unresolved_for_triplets(unrelated_comps,
-                    unrelated_unresolved, central_bboxes, focussed_comps, related_resolved_comps,
-                    source_names,
-                    segmentation_dir, imsize=imsize)
+            self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
+                bbox[0],bbox[1],bbox[2],bbox[3]) and not unresolved
+                            for unresolved, x,y in list(zip(unresolved_list, xs,ys))])
+                            for (xs, ys), unresolved_list (bbox, score) 
+                            in zip(self.related_comps, self.related_unresolved,
+                                self.pred_central_bboxes_scores)]
 
-             self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
+            # Check if unrelated source comps fall inside predicted central box
+            self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
+                bbox[0],bbox[1],bbox[2],bbox[3]) and not unresolved 
+                        for unresolved, x,y in zip(unresolved_list, xs,ys)])
+                               for (xs,ys), unresolved_list, (bbox, score) in zip(
+                                   self.unrelated_comps, self.unrelated_unresolved,
+                                   self.pred_central_bboxes_scores)]
+        else:
+
+            self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
                  bbox[0],bbox[1],bbox[2],bbox[3]) 
                              for x,y in list(zip(comps[0],comps[1]))])
                              for comps, (bbox, score) 
                              in zip(self.related_comps, self.pred_central_bboxes_scores)]
 
-             # Check if unrelated source comps fall inside predicted central box
-             self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
-                 bbox[0],bbox[1],bbox[2],bbox[3]) 
-                         for x,y in zip(xs,ys)])
-                                for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
-                                    self.pred_central_bboxes_scores)]
-         else:
-  
-             self.comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
-                 bbox[0],bbox[1],bbox[2],bbox[3]) 
-                             for x,y in list(zip(comps[0],comps[1]))])
-                             for comps, (bbox, score) 
-                             in zip(self.related_comps, self.pred_central_bboxes_scores)]
-  
-             if debug:
+            if debug:
                  print("comp_scores")
                  print(self.comp_scores[0])
                  print('len comp_scores ',len(self.comp_scores))
-  
-             # Check if unrelated source comps fall inside predicted central box
-             self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
+
+            # Check if unrelated source comps fall inside predicted central box
+            self.close_comp_scores = [np.sum([self.is_within(x*scale_factor,y*scale_factor,
                  bbox[0],bbox[1],bbox[2],bbox[3]) 
                          for x,y in zip(xs,ys)])
                                 for (xs,ys), (bbox, score) in zip(self.unrelated_comps,
