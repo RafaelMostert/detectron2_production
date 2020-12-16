@@ -248,10 +248,21 @@ class LOFAREvaluator(DatasetEvaluator):
                  for bboxes_scores,max_score in zip(self.second_best,max_scores)]
 
         # Check which components fall within the predicted bbox with the highest score
-        self.comp_inside_box = [[foc_name]+[name for x,y,name in zip(xs,ys,names) 
-                                    if self.is_within(x*scale_factor,y*scale_factor,bbox[0],bbox[1],bbox[2],bbox[3])]
-                            for (xs,ys),names, (bbox, score), foc_name in zip(self.unrelated_comps,
-                                    self.unrelated_names,self.pred_central_bboxes_scores,self.focussed_names)]
+        if self.remove_unresolved:
+            self.reinsert_unresolved_for_triplets()
+            self.comp_inside_box = [[foc_name]+[name for x,y,unresolved,name in zip(
+                    xs,ys,unresolved_list,names) 
+                    if self.is_within(x*scale_factor,y*scale_factor,bbox[0],bbox[1],bbox[2],bbox[3]) \
+                                        and not unresolved]
+                                for (xs,ys),unresolved_list, names, (bbox, score), foc_name in zip(self.unrelated_comps,
+                                    self.unrelated_unresolved,
+                                        self.unrelated_names,self.pred_central_bboxes_scores,self.focussed_names)]
+        else:
+            self.comp_inside_box = [[foc_name]+[name for x,y,name in zip(xs,ys,names) 
+                                        if self.is_within(x*scale_factor,y*scale_factor,bbox[0],bbox[1],bbox[2],bbox[3])]
+                                for (xs,ys),names, (bbox, score), foc_name in zip(self.unrelated_comps,
+                                        self.unrelated_names,self.pred_central_bboxes_scores,self.focussed_names)]
+
         # Get bbox sizes
         sizes = [self.area(bbox) for bbox, score in self.pred_central_bboxes_scores]
         # Get indices of appearing focussed comp with largest box
@@ -337,22 +348,6 @@ class LOFAREvaluator(DatasetEvaluator):
             else:
                 unrelated_resolved_in_predicted_bboxes.append([[],[]])
 
-        """
-        related_resolved_in_predicted_bboxes = [np.array([xs,ys])[[self.is_within(x,y,
-            bbox[0],bbox[1],bbox[2],bbox[3]) and not unresolved \
-                    for unresolved, x,y in zip(unresolved_list, xs,ys)]] \
-                    for (xs,ys), unresolved_list, (bbox,score) \
-                    in zip(self.related_comps, self.related_unresolved,
-                                    self.pred_central_bboxes_scores)]
-
-        unrelated_resolved_in_predicted_bboxes = [np.array([xs,ys])[[self.is_within(x,y,
-            bbox[0],bbox[1],bbox[2],bbox[3]) and not unresolved \
-                    for unresolved, x,y in zip(unresolved_list, xs,ys)]] \
-                                      for (xs,ys), unresolved_list, (bbox,score) \
-                                      in zip(self.unrelated_comps, self.unrelated_unresolved,
-                                          self.pred_central_bboxes_scores)]
-
-        """
         # If so proceed with following actions.
         segmentation_paths = [os.path.join(self.segmentation_dir, f"{s}_{imsize}.pkl")
                 for s in self.focussed_names]
