@@ -99,13 +99,15 @@ class LOFAREvaluator(DatasetEvaluator):
                     "unrelated_comp":input["unrelated_comp"],
                     "related_unresolved":input["related_unresolved"],
                     "unrelated_unresolved":input["unrelated_unresolved"],
+                    "wide_focus":input["wide_focus"],
                     "unrelated_names":input["unrelated_names"]}
             else:
                 prediction = {"image_id": input["image_id"], "file_name":input["file_name"],
                     "focussed_comp":input["focussed_comp"],"related_comp":input["related_comp"],
                     "unrelated_comp":input["unrelated_comp"],
                     "related_unresolved":input["related_unresolved"],
-                    "unrelated_unresolved":input["unrelated_unresolved"]}
+                    "unrelated_unresolved":input["unrelated_unresolved"],
+                    "wide_focus":input["wide_focus"]}
 
             if "instances" in output:
                 instances = output["instances"].to(self._cpu_device)#.numpy()
@@ -121,6 +123,7 @@ class LOFAREvaluator(DatasetEvaluator):
         if self.remove_unresolved:
             self.related_unresolved = [p["related_unresolved"] for p in self._predictions]
             self.unrelated_unresolved = [p["unrelated_unresolved"] for p in self._predictions]
+            self.wide_focus = [p["wide_focus"] for p in self._predictions]
             #print("related unresolved:", self.related_unresolved[0])
             #print("unrelated unresolved:", self.unrelated_unresolved[0])
 
@@ -371,8 +374,8 @@ class LOFAREvaluator(DatasetEvaluator):
                     plt.show()
 
                 # Find segmentation islands corresponding to radio components
-                pixel_xs = [self.focussed_comps[t][0]]+list(related_comp[0])+list(unrelated_comp[0])
-                pixel_ys = [self.focussed_comps[t][1]]+list(related_comp[1])+list(unrelated_comp[1])
+                pixel_xs = [self.focussed_comps[t][0]]+self.wide_focus[t][0]+list(related_comp[0])+list(unrelated_comp[0])
+                pixel_ys = [self.focussed_comps[t][1]]+self.wide_focus[t][1]+list(related_comp[1])+list(unrelated_comp[1])
                 if debug:
                     print("pixel_xs", pixel_xs)
                     print("pixel_ys", pixel_ys)
