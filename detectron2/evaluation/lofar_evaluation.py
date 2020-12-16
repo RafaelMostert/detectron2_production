@@ -124,6 +124,8 @@ class LOFAREvaluator(DatasetEvaluator):
             self.related_unresolved = [p["related_unresolved"] for p in self._predictions]
             self.unrelated_unresolved = [p["unrelated_unresolved"] for p in self._predictions]
             self.wide_focus = [p["wide_focus"] for p in self._predictions]
+            self.old_related_unresolved = copy.deepcopy(self.related_unresolved)
+            self.old_unrelated_unresolved = copy.deepcopy(self.unrelated_unresolved)
             #print("related unresolved:", self.related_unresolved[0])
             #print("unrelated unresolved:", self.unrelated_unresolved[0])
 
@@ -570,7 +572,6 @@ class LOFAREvaluator(DatasetEvaluator):
         #    return
         from cv2 import imread
 
-        print("Inside plot_predictions, outputdir is:", self._output_dir)
         # Make dir to collect the failed images in
         fail_dir = os.path.join(self._output_dir, self._dataset_name+'_'+fail_dir_name)
         os.makedirs(fail_dir,exist_ok=True)
@@ -581,9 +582,9 @@ class LOFAREvaluator(DatasetEvaluator):
             os.remove(os.path.join(fail_dir,f))
 
         # Copy debug images to this dir 
-        debug=True
         if debug:
             print('misboxed output dir',fail_dir)
+        debug=True
 
         # if code fails here the debug source name or path is probably incorrect
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
@@ -612,10 +613,20 @@ class LOFAREvaluator(DatasetEvaluator):
                         copyfileobj(fin, fout, 128*1024)
         else:
             for i in cutout_list:
-                focus_name, focus_l, rel_l, unrel_l, (bbox,score), src, dest = self.focussed_names[i], \
-                        self.focussed_comps[i], \
-                    self.related_comps[i], self.unrelated_comps[i], \
-                    self.pred_central_bboxes_scores[i], image_source_paths[i], image_dest_paths[i]
+                if self.remove_unresolved:
+
+                    focus_name, focus_l, rel_l, unrel_l, rel_unresolved, \
+                    unrel_unresolved,old_rel_unresolved,  old_unrel_unresolved, (bbox,score), src, dest = self.focussed_names[i], \
+                            self.focussed_comps[i], \
+                        self.related_comps[i], self.unrelated_comps[i], \
+                        self.related_unresolved[i], self.unrelated_unresolved[i], \
+                        self.old_related_unresolved[i], self.old_unrelated_unresolved[i], \
+                        self.pred_central_bboxes_scores[i], image_source_paths[i], image_dest_paths[i]
+                else:
+                    focus_name, focus_l, rel_l, unrel_l, (bbox,score), src, dest = self.focussed_names[i], \
+                            self.focussed_comps[i], \
+                        self.related_comps[i], self.unrelated_comps[i], \
+                        self.pred_central_bboxes_scores[i], image_source_paths[i], image_dest_paths[i]
 
                 # Open image 
                 #print(src)
@@ -628,9 +639,9 @@ class LOFAREvaluator(DatasetEvaluator):
                 # Bounding box
                 ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
                         np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
-                if debug and dest.endswith('ILTJ110530.36+465055.8_radio_DR2_rotated0deg.png'):
-                    print('bbox plotted in debug image:', bbox)
-                    print('predicted bboxes and scores:', self.pred_bboxes_scores[i])
+                #if debug and dest.endswith('ILTJ110530.36+465055.8_radio_DR2_rotated0deg.png'):
+                #    print('bbox plotted in debug image:', bbox)
+                #    print('predicted bboxes and scores:', self.pred_bboxes_scores[i])
 
                 if show_second_best:
                     ax1.text(bbox[0],bbox[1],f"{score:.1%}")
@@ -654,11 +665,34 @@ class LOFAREvaluator(DatasetEvaluator):
                 else:
                     ax1.set_title(focus_name)
                 # Plot component locations
-                ax1.plot(focus_l[0],focus_l[1],marker='s', markersize=10,color='r')
-                for x,y in zip(rel_l[0],rel_l[1]):
-                    ax1.plot(x,y,marker='.',markersize=8,color='r')
-                for x,y in zip(unrel_l[0],unrel_l[1]):
-                    ax1.plot(x,y,marker='.',markersize=8,color='lime')
+                if self.inference_only:
+                    focus_color = 'lime'
+                else:
+                    focus_color = 'red'
+                ax1.plot(focus_l[0],focus_l[1],marker='s', markersize=9,color=focus_color)
+                if self.remove_unresolved:
+                    for unresolved,old_unresolved, x,y in zip(rel_unresolved,old_rel_unresolved,rel_l[0],rel_l[1]):
+                        if old_unresolved:
+                            marker='x'
+                        else:
+                            marker='.'
+                        ax1.plot(x,y,marker=marker,markersize=8,color='r')
+                        if unresolved != old_unresolved:
+                            ax1.plot(x,y,marker='+',markersize=8,color='r')
+                    for unresolved,old_unresolved,x,y in zip(unrel_unresolved,old_unrel_unresolved, unrel_l[0],unrel_l[1]):
+                        if old_unresolved:
+                            marker='x'
+                        else:
+                            marker='.'
+                        ax1.plot(x,y,marker=marker,markersize=8,color='lime')
+                        if unresolved != old_unresolved:
+                            ax1.plot(x,y,marker='+',markersize=8,color='lime')
+                else:
+                    for x,y in zip(rel_l[0],rel_l[1]):
+                        ax1.plot(x,y,marker='.',markersize=8,color='r')
+                    for x,y in zip(unrel_l[0],unrel_l[1]):
+                        ax1.plot(x,y,marker='.',markersize=8,color='lime')
+
                 #if not show_second_best:
                 #    ax1.axes.xaxis.set_visible(False)
                 #    ax1.axes.yaxis.set_visible(False)    
