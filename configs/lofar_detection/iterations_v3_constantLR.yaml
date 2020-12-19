@@ -1,0 +1,16 @@
+_BASE_: "base_lofar.yaml"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/v3_constantLR/"
+DATASET_PATH: "/data/mostertrij/data/frcnn_images/LGZ300/LGZ_COCOstyle/annotations/"
+DATASETS:
+  TRAIN: ("train",)
+  TEST: ("train","val","test")
+INPUT:
+  ROTATION_ENABLED: False
+SOLVER:
+  #LR_SCHEDULER_NAME:  "WarmupCosineLR" 
+  STEPS: ()
+  MAX_ITER: 100000 
+  CHECKPOINT_PERIOD: 20000
+TEST:
+  EVAL_PERIOD: 20000
+  EXTRA_EVAL: [1,100,1000,4000,8000,16000]
