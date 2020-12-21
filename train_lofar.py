@@ -29,12 +29,16 @@ random.seed(5455)
 assert len(argv) > 1, "Insert path of configuration file when executing this script"
 cfg = get_cfg()
 cfg.merge_from_file(argv[1])
-if len(argv) == 3:
+if len(argv) >= 3:
     start_dir = argv[2]
+    print("Training seed is:", cfg.SEED)
     print("Beginning of paths:", start_dir)
     cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
     cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
     cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
+    if len(argv) == 4:
+        cfg.SEED = int(argv[3])
+        cfg.OUTPUT_DIR += f'_seed{cfg.SEED}'
 print(f"Loaded configuration file {argv[1]}")
 #ROTATION_ENABLED = bool(int(argv[2])) # 0 is False, 1 is True
 DATASET_PATH= cfg.DATASET_PATH
