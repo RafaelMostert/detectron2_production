@@ -31,14 +31,17 @@ cfg = get_cfg()
 cfg.merge_from_file(argv[1])
 if len(argv) >= 3:
     start_dir = argv[2]
-    print("Training seed is:", cfg.SEED)
     print("Beginning of paths:", start_dir)
     cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
     cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
     cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
     if len(argv) == 4:
         cfg.SEED = int(argv[3])
-        cfg.OUTPUT_DIR += f'_seed{cfg.SEED}'
+        if cfg.OUTPUT_DIR.endswith('/'):
+            cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_seed{cfg.SEED}'
+        else:
+            cfg.OUTPUT_DIR += f'_seed{cfg.SEED}'
+    print("Training seed is:", cfg.SEED)
 print(f"Loaded configuration file {argv[1]}")
 #ROTATION_ENABLED = bool(int(argv[2])) # 0 is False, 1 is True
 DATASET_PATH= cfg.DATASET_PATH
@@ -98,6 +101,7 @@ train_dict = get_lofar_dicts(os.path.join(DATASET_PATH,"VIA_json_train.pkl"))
 for i, d in enumerate(random.sample(train_dict, 3)):
     #for i, d in enumerate(train_dict):
     img = imread(d["file_name"])
+    print('img filename:', d["file_name"])
     visualizer = Visualizer(img[:, :, ::-1], metadata=lofar_metadata, scale=1)
     vis = visualizer.draw_dataset_dict(d)
     a= vis.get_image()[:, :, ::-1]
