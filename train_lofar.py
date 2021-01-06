@@ -71,13 +71,13 @@ def get_lofar_dicts(annotation_filepath):
         if cfg.MODEL.PROPOSAL_GENERATOR:
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
         if cfg.INPUT.ROTATION_ENABLED:
-            if len(argv) == 3:
+            if len(argv) >= 3:
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace('/data2/','/data/').replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
             counter+=1 
         else:
             if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
-                if len(argv) == 3:
+                if len(argv) >= 3:
                     dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace('/data2/','/data/').replace("/data/mostertrij",start_dir)
                 new_data.append(dataset_dicts[i])
                 counter+=1

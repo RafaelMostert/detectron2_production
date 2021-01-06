@@ -31,8 +31,8 @@ from shapely.geometry import Polygon
 from shapely.ops import cascaded_union
 random.seed(5455)
 
-assert len(argv) == 4, ("Insert 1) path of configuration file, 2) beginning of file path, 3) full "
-    "path to model weights, when executing this script")
+assert len(argv) >= 4, ("Insert 1) path of configuration file, 2) beginning of file path, 3) full "
+    "path to model weights 4) optional the seed, when executing this script")
 cfg = get_cfg()
 cfg.merge_from_file(argv[1])
 lotss_dr2_path = '/data/mostertrij/data/catalogues/LoTSS_DR2_v100.srl.h5'
@@ -42,6 +42,15 @@ start_dir = argv[2]
 print("Beginning of paths:", start_dir)
 cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
 cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
+
+if len(argv) == 5:
+    cfg.SEED = int(argv[4])
+    if cfg.OUTPUT_DIR.endswith('/'):
+        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_seed{cfg.SEED}'
+    else:
+        cfg.OUTPUT_DIR += f'_seed{cfg.SEED}'
+    print("Training seed is:", cfg.SEED)
+
 cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
 lotss_dr2_path = lotss_dr2_path.replace("/data/mostertrij",start_dir)
 
