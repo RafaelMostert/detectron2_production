@@ -671,7 +671,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     focus_color = 'red'
                 ax1.plot(focus_l[0],focus_l[1],marker='s', markersize=9,color=focus_color)
                 if self.remove_unresolved:
-                    print("Inside plot_pred, remove unresolved is on")
+                    #print("Inside plot_pred, remove unresolved is on")
                     for unresolved,old_unresolved, x,y in zip(rel_unresolved,old_rel_unresolved,rel_l[0],rel_l[1]):
                         if old_unresolved:
                             marker='x'

@@ -46,9 +46,9 @@ cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
 if len(argv) == 5:
     cfg.SEED = int(argv[4])
     if cfg.OUTPUT_DIR.endswith('/'):
-        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_seed{cfg.SEED}'
+        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_seed{cfg.SEED}_eva'
     else:
-        cfg.OUTPUT_DIR += f'_seed{cfg.SEED}'
+        cfg.OUTPUT_DIR +=  f'_seed{cfg.SEED}_eva'
     print("Training seed is:", cfg.SEED)
 
 cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
@@ -89,7 +89,7 @@ def get_lofar_dicts(annotation_filepath):
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
 
         if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
-            if len(argv) == 4:
+            if len(argv) >= 4:
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data2/mostertrij",start_dir)
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
