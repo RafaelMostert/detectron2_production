@@ -28,7 +28,9 @@ random.seed(5455)
 
 assert len(argv) > 1, "Insert path of configuration file when executing this script"
 cfg = get_cfg()
+print(cfg.TEST.REMOVE_THRESHOLD,type(cfg.TEST.REMOVE_THRESHOLD))
 cfg.merge_from_file(argv[1])
+print("after readfromfile:", cfg.TEST.REMOVE_THRESHOLD,type(cfg.TEST.REMOVE_THRESHOLD))
 if len(argv) >= 3:
     start_dir = argv[2]
     print("Beginning of paths:", start_dir)

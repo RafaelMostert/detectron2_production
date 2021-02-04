@@ -237,8 +237,8 @@ class FastRCNNOutputs:
             scalar Tensor
         """
         if self._no_instances:
-            print("DEBUG print, we encounter no instances, pred_proposal_deltas is 0")
-            return 0.0 #* self.pred_proposal_deltas.sum()
+            #print("DEBUG print, we encounter no instances, pred_proposal_deltas is 0")
+            return 0.0 * self.pred_proposal_deltas.sum()
 
         box_dim = self.gt_boxes.tensor.size(1)  # 4 or 5
         cls_agnostic_bbox_reg = self.pred_proposal_deltas.size(1) == box_dim

@@ -114,7 +114,8 @@ for i, dic in enumerate(random.sample(inference_dict, 3)):
 # for train eval those things are somewhere within a model 
 # specifically a model that takes data and retuns a dict of losses
 #pretrained_model_path = "/data/mostertrij/tridentnet/output/v4_all_withRot/model_0059999.pth".replace('/data/mostertrij',start_dir)
-pretrained_model_path = "/data/mostertrij/tridentnet/output/v3_precomputed_constantLR_withRot_no_box_reg/model_0005999.pth".replace('/data/mostertrij',start_dir)
+#pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
+pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
 print("Load model:", pretrained_model_path)
 cfg.MODEL.WEIGHTS = os.path.join(pretrained_model_path)  # path to the model we just trained
 trainer = LOFARTrainer(cfg) 
@@ -126,6 +127,7 @@ inference_loader = build_detection_test_loader(cfg, d)
 print('Load LOFAR evaluator.')
 evaluator = LOFAREvaluator(d, cfg.OUTPUT_DIR, distributed=True, inference_only=True,
             remove_unresolved=cfg.TEST.REMOVE_UNRESOLVED,
+            segmentation_dir=f'/data1/mostertrij/data/cache/segmentation_maps_{cfg.TEST.REMOVE_THRESHOLD}',
         kafka_to_lgm=False,component_save_name="bare_predicted_component_catalogue")
 print('Start inference on dataset.')
 predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=True)

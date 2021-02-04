@@ -713,6 +713,7 @@ class LOFARTrainer(SimpleTrainer):
         def test_and_save_results():
             self._last_eval_results = self.test(self.cfg, self.model,
                     evaluators=[LOFAREvaluator(t, cfg.OUTPUT_DIR,
+            segmentation_dir=f'/data1/mostertrij/data/cache/segmentation_maps_{cfg.TEST.REMOVE_THRESHOLD}',
                         remove_unresolved=cfg.TEST.REMOVE_UNRESOLVED)
                         for t in self.cfg.DATASETS.TEST])
             return self._last_eval_results
