@@ -89,6 +89,9 @@ class LOFAREvaluator(DatasetEvaluator):
         self.focussed_names = []
         self.n_comps = []
         self.pred_bboxes_scores = []
+        # -1 unknown, 0  good association, 1 single missing, 2 single
+        # overestimated, 3 multi underestimated, 4 multi overestimated
+        self.misboxed_category = [] 
 
     def process(self, inputs, outputs):
         # Save ground truths and predicted bounding boxes to this class
@@ -120,6 +123,10 @@ class LOFAREvaluator(DatasetEvaluator):
         self.focussed_comps = [p["focussed_comp"] for p in self._predictions]
         self.related_comps = [p["related_comp"] for p in self._predictions]
         self.unrelated_comps = [p["unrelated_comp"] for p in self._predictions]
+        if self.inference_only:
+            self.misboxed_category = np.array([-1 for p in self._predictions])
+        else:
+            self.misboxed_category = np.array([0 for p in self._predictions])
         if self.remove_unresolved:
             self.related_unresolved = [p["related_unresolved"] for p in self._predictions]
             self.unrelated_unresolved = [p["unrelated_unresolved"] for p in self._predictions]
@@ -247,10 +254,10 @@ class LOFAREvaluator(DatasetEvaluator):
         self.pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
                                       if len(bboxes_scores) > 0 else [[-1,-1,-1,-1],0] 
                                       for bboxes_scores in pred_central_bboxes_scores]
-        max_scores =[score for bbox,score in self.pred_central_bboxes_scores] 
-        self.second_best = [[(box,score) for box,score in bboxes_scores if score >
-            max_score-max_score_threshold]
-                 for bboxes_scores,max_score in zip(self.second_best,max_scores)]
+        #max_scores =[score for bbox,score in self.pred_central_bboxes_scores] 
+        #self.second_best = [[(box,score) for box,score in bboxes_scores if score >
+        #    max_score-max_score_threshold]
+        #         for bboxes_scores,max_score in zip(self.second_best,max_scores)]
 
         # Check which components fall within the predicted bbox with the highest score
         if self.remove_unresolved:
@@ -502,11 +509,18 @@ class LOFAREvaluator(DatasetEvaluator):
         # Record for which images we have no central bbox
         self.central_covered = [True if len(bboxes_scores) > 0 else False 
                                       for bboxes_scores in pred_central_bboxes_scores]
+
+        # Take only the highest scoring bbox from this list of bboxes
         
         # Take only the highest scoring bbox from this list of bboxes
+        max_score_threshold=0.05
+        self.second_best = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[1:4] 
+                                      if len(bboxes_scores) > 1 else [[[-1,-1,-1,-1],-99]] 
+                                      for bboxes_scores in pred_central_bboxes_scores]
         self.pred_central_bboxes_scores = [sorted(bboxes_scores, key=itemgetter(1), reverse=True)[0] 
                                       if len(bboxes_scores) > 0 else [[-1,-1,-1,-1],0] 
                                       for bboxes_scores in pred_central_bboxes_scores]
+        #max_scores =[score for bbox,score in self.pred_central_bboxes_scores] 
         assert len(self.unrelated_comps) == len(self.pred_central_bboxes_scores)
         if debug:
             print("pred_bboxes_scores after getting the highest scoring bbox")
@@ -560,7 +574,19 @@ class LOFAREvaluator(DatasetEvaluator):
 
         print("Plot predictions")
         if debug or self.save_predictions:
-            self.plot_predictions(f"all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))), debug=False)
+            self.plot_predictions(f"all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))),
+                    debug=False, show_second_best=True)
+        # Save predictions, scores and misboxed categories
+        fail_dir = os.path.join(self._output_dir, self._dataset_name+'_'+fail_dir_name)
+        os.makedirs(fail_dir,exist_ok=True)
+        image_source_paths = [p["file_name"] for p in self._predictions[0]]
+        source_names = [p.split('/')[-1] for p in image_source_paths]
+        image_dest_paths = [os.path.join("all_prediction_debug_images", image_source_path.split('/')[-1])
+                for image_source_path in image_source_paths]
+        np.savez(os.path.join(self._output_dir, "prediction_statistics.npz"),
+                self.focussed_names, image_source_paths, image_dest_paths 
+                self.pred_central_bboxes_scores,
+                self.second_best, self.misboxed_category)
 
         return includes_associated_fail_fraction, includes_unassociated_fail_fraction
 
@@ -568,9 +594,12 @@ class LOFAREvaluator(DatasetEvaluator):
             lgm_to_kafka=False, show_second_best=False):
         """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
         components so that they can be inspected to improve the box-draw-process"""
+        #TODO: remove temporary debug return
+        return
         #if (self._dataset_name not in [ 'test', 'val','inference']) or cutout_list is None:
         #    return
         from cv2 import imread
+        cmap = plt.get_cmap("tab10")
 
         # Make dir to collect the failed images in
         fail_dir = os.path.join(self._output_dir, self._dataset_name+'_'+fail_dir_name)
@@ -635,7 +664,31 @@ class LOFAREvaluator(DatasetEvaluator):
                 # Plot figure 
                 f, ax1 = plt.subplots(1,1, figsize=(8,6))
                 # Radio intensity
+                im[:,:,1] = 255-im[:,:,1]
                 ax1.imshow(im)
+        
+                if show_second_best:
+                    ax1.text(bbox[0],bbox[1]-1,f"{score:.1%}")
+                    for tl, (bbox2, score2) in enumerate(self.second_best[i]):
+                        # Second best bounding box
+                        color = cmap(tl)
+                        if score2 < 0:
+                            break
+                        if tl==0: ax1.text(bbox2[2]+2,bbox2[1]-1,f"{score2:.1%}", color=color)
+                        #if tl==1: ax1.text(bbox2[2]+20,bbox2[3],f"{score2:.1%}", color=color)
+                        #if tl==2: ax1.text(bbox2[0],bbox2[3],f"{score2:.1%}", color=color)
+                        ax1.plot([bbox2[0],bbox2[2],bbox2[2],bbox2[0],bbox2[0]],
+                                np.array([bbox2[1],bbox2[1],bbox2[3],bbox2[3],bbox2[1]]),linestyle='dashed',color=color)
+                        break
+
+                    #for tl, (bbox2, score,color) in enumerate(self.second_best[i],cmap[i]):
+                    #    # Second best bounding box
+                    #    if tl==0: ax1.text(bbox2[2]+20,bbox2[1],f"{score:.1%}", color=color)
+                    #    #if tl==1: ax1.text(bbox2[2]+20,bbox2[3],f"{score:.1%}", color=color)
+                    #    #if tl==2: ax1.text(bbox2[0],bbox2[3],f"{score:.1%}", color=color)
+                    #    ax1.plot([bbox2[0],bbox2[2],bbox2[2],bbox2[0],bbox2[0]],
+                    #            np.array([bbox2[1],bbox2[1],bbox2[3],bbox2[3],bbox2[1]]),linestyle='dashed',color=color)
+
                 # Bounding box
                 ax1.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
                         np.array([bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]]),'k')
@@ -643,15 +696,16 @@ class LOFAREvaluator(DatasetEvaluator):
                 #    print('bbox plotted in debug image:', bbox)
                 #    print('predicted bboxes and scores:', self.pred_bboxes_scores[i])
 
-                if show_second_best:
-                    ax1.text(bbox[0],bbox[1],f"{score:.1%}")
-                    for tl, (bbox2, score) in enumerate(self.second_best[i]):
-                        # Second best bounding box
-                        if tl==0: ax1.text(bbox2[2],bbox2[1],f"{score:.1%}")
-                        if tl==1: ax1.text(bbox2[2],bbox2[3],f"{score:.1%}")
-                        if tl==2: ax1.text(bbox2[0],bbox2[3],f"{score:.1%}")
-                        ax1.plot([bbox2[0],bbox2[2],bbox2[2],bbox2[0],bbox2[0]],
-                                np.array([bbox2[1],bbox2[1],bbox2[3],bbox2[3],bbox2[1]]),'gray')
+                # Plot optical
+                plot_optical=False
+                if plot_optical:
+                    for w,x,y in zip(cutout.optical_sources['w1Mag'], 
+                            cutout.optical_sources['x'],cutout.optical_sources['y']):
+                        if not np.isnan(w):
+                            marker='+'
+                            #ax1.text(x,y,f"{w:.2f}",color='y')
+                            ax1.plot(x,y,marker=marker,markersize=8,color='y')
+
 
 
                 if debug:
@@ -694,6 +748,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     for x,y in zip(unrel_l[0],unrel_l[1]):
                         ax1.plot(x,y,marker='.',markersize=8,color='lime')
 
+
                 #if not show_second_best:
                 #    ax1.axes.xaxis.set_visible(False)
                 #    ax1.axes.yaxis.set_visible(False)    
@@ -724,13 +779,17 @@ class LOFAREvaluator(DatasetEvaluator):
             ran = list(range(len(self.close_comp_scores)))
             fail_indices = [i for i, n_comp, unrelated in 
                 zip(ran, self.n_comps, self.close_comp_scores) if n_comp == 1 and unrelated > 0]
-            self.plot_predictions("single_overestimation", imsize=200,cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
+            self.misboxed_category[fail_indices] = 2
+            self.plot_predictions("single_overestimation", imsize=200,cutout_list=fail_indices,
+                    show_second_best=True, debug=False, lgm_to_kafka=False)
 
             # Collect single comp sources that fail to include their gt comp
             fail_indices = [i for i, n_comp, unrelated in 
                                      zip(ran, self.n_comps, self.close_comp_scores) 
                                      if n_comp > 1 and unrelated > 0]
-            self.plot_predictions("multi_overestimation", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
+            self.misboxed_category[fail_indices] = 4
+            self.plot_predictions("multi_overestimation",
+                    cutout_list=fail_indices, show_second_best=True,  debug=False, lgm_to_kafka=False)
         return single_comp_fail_frac, multi_comp_binary_fail_frac
 
 
@@ -757,16 +816,17 @@ class LOFAREvaluator(DatasetEvaluator):
             ran = list(range(len(self.n_comps)))
             fail_indices = [i for i, n_comp,central_covered in zip(ran, self.n_comps, self.central_covered) 
                     if n_comp == 1 and not central_covered ]
-            self.plot_predictions("single_missing", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
+            self.plot_predictions("single_missing", cutout_list=fail_indices, show_second_best=True, debug=False, lgm_to_kafka=False)
+            self.misboxed_category[fail_indices] = 1
             # Collect single comp sources that fail to include their gt comp
-            fail_indices = [i for i, n_comp, total in zip(ran, self.n_comps, self.comp_scores) 
-                    if ((n_comp > 1) and (n_comp != total)) ]
             fail_indices = [i for i, n_comp, central_covered, related, unrelated in
                 zip(ran, self.n_comps, self.central_covered, self.comp_scores, 
                     self.close_comp_scores) 
                 if n_comp > 1 and ((central_covered and unrelated == 0 and n_comp > (related+1)) \
                         or (not central_covered))]
-            self.plot_predictions("multi_underestimation", cutout_list=fail_indices, debug=False, lgm_to_kafka=False)
+            self.misboxed_category[fail_indices] = 3
+            self.plot_predictions("multi_underestimation", cutout_list=fail_indices,
+                    show_second_best=True, debug=False, lgm_to_kafka=False)
 
         return single_comp_fail_frac, multi_comp_binary_fail_frac
     

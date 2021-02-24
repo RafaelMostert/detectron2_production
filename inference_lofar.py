@@ -115,7 +115,8 @@ for i, dic in enumerate(random.sample(inference_dict, 3)):
 # specifically a model that takes data and retuns a dict of losses
 #pretrained_model_path = "/data/mostertrij/tridentnet/output/v4_all_withRot/model_0059999.pth".replace('/data/mostertrij',start_dir)
 #pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
-pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
+#pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
+pretrained_model_path = "/data/mostertrij/tridentnet/output/uLB300_precomputed_removed_withRot_constantLR_seed1/model_0009999.pth".replace('/data/mostertrij',start_dir)
 print("Load model:", pretrained_model_path)
 cfg.MODEL.WEIGHTS = os.path.join(pretrained_model_path)  # path to the model we just trained
 trainer = LOFARTrainer(cfg) 
