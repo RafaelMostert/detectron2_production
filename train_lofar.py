@@ -69,13 +69,24 @@ def get_lofar_dicts(annotation_filepath):
     with open(annotation_filepath, "rb") as f:
         dataset_dicts = pickle.load(f)
     new_data = []
-    counter=1
-    max_value = np.inf
+    train_size_limited = False
     if annotation_filepath.endswith('train.pkl'): 
-        max_value = min(cfg.DATASETS.TRAIN_SIZE,len(dataset_dicts))
+        if cfg.DATASETS.TRAIN_SIZE < len(dataset_dicts) and cfg.INPUT.ROTATION_ENABLED:
+            assert cfg.INPUT.ROTATION_ENABLED, ("limiting the size of the training set is only", \
+                "implemented with rotation augmentation enabled.")
+            # for a filename like /data/ILTJ130552.61+495745.5_radio_DR2_rotated0deg.png
+            # this leaves us with a list of names like ILTJ130552.61+495745.5 
+            component_names = list([dataset_dicts[i]['file_name'].split('/')[-1].split('_')[0]
+                    for i in range(len(dataset_dicts)) 
+                    if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png')])
+            assert len(component_names) == len(set(component_names)), "duplicate sources entering training set."
+            component_names = component_names[:cfg.DATASETS.TRAIN_SIZE]
+            print("Debug, first ten component names:",component_names[:10])
+            train_size_limited = True
+            
+
     for i in range(len(dataset_dicts)):
-        if counter > max_value:
-            break
+        component_name = dataset_dicts[i]['file_name'].split('/')[-1].split('_')[0]
         for ob in dataset_dicts[i]['annotations']:
             ob['bbox_mode'] = BoxMode.XYXY_ABS
         if cfg.MODEL.PROPOSAL_GENERATOR:
@@ -83,19 +94,18 @@ def get_lofar_dicts(annotation_filepath):
         if cfg.INPUT.ROTATION_ENABLED:
             if len(argv) >= 3:
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace('/data2/','/data/').replace("/data/mostertrij",start_dir)
-            new_data.append(dataset_dicts[i])
-            counter+=1 
+            if not train_size_limited or component_name in component_names:
+                new_data.append(dataset_dicts[i])
         else:
             if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
                 if len(argv) >= 3:
                     dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace('/data2/','/data/').replace("/data/mostertrij",start_dir)
                 new_data.append(dataset_dicts[i])
-                counter+=1
     print('len dataset is:', len(new_data), annotation_filepath)
     return new_data
 
 # Register data inside detectron
-# With DATASET_SIZES one can limit the size of these datasets
+# With cfg.DATASETS.TRAIN_SIZE one can limit the size of the train dataset
 for d in ["train", "val", "test"]:
     DatasetCatalog.register(d, 
                             lambda d=d:
