@@ -37,7 +37,7 @@ if len(argv) >= 3:
     cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
     cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
     cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
-    if len(argv) == 4:
+    if len(argv) >= 4:
         cfg.SEED = int(argv[3])
         if cfg.OUTPUT_DIR.endswith('/'):
             cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_seed{cfg.SEED}'
@@ -50,8 +50,16 @@ DATASET_PATH= cfg.DATASET_PATH
 print(f"Experiment: {cfg.EXPERIMENT_NAME}")
 print(f"Rotation enabled: {cfg.INPUT.ROTATION_ENABLED}")
 print(f"Precomputed bboxes: {cfg.MODEL.PROPOSAL_GENERATOR}")
-print(f"Output path: {cfg.OUTPUT_DIR}")
 print(f"Attempt to load training data from: {DATASET_PATH}")
+if len(argv) == 5:
+    train_dataset_size = int(argv[4])
+    cfg.DATASETS.TRAIN_SIZE = train_dataset_size
+    print(f"Training data set contains {cfg.DATASETS.TRAIN_SIZE} images.")
+    if cfg.OUTPUT_DIR.endswith('/'):
+        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_{train_dataset_size}' 
+    else:
+        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR + f'_{train_dataset_size}'
+print(f"Output path: {cfg.OUTPUT_DIR}")
 os.makedirs(cfg.OUTPUT_DIR,exist_ok=True)
 
 

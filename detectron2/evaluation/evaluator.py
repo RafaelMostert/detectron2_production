@@ -145,8 +145,11 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
         print("Loading existing predictions")
         #evaluator._predictions = load_obj(predictions_save_path)
         (evaluator._predictions, evaluator.focussed_comps, evaluator.related_comps, 
-            evaluator.unrelated_comps,
-            evaluator.n_comps,evaluator.pred_bboxes_scores,evaluator.unrelated_names,evaluator.focussed_names) = load_obj(predictions_save_path)
+            evaluator.unrelated_comps,evaluator.n_comps,evaluator.pred_bboxes_scores,
+            evaluator.unrelated_names,evaluator.focussed_names,
+            evaluator.related_unresolved, evaluator.unrelated_unresolved, 
+            evaluator.wide_focus, evaluator.old_related_unresolved,
+            evaluator.old_unrelated_unresolved, evaluator.misboxed_category)  = load_obj(predictions_save_path)
     else:
 
         num_warmup = min(5, total - 1)
@@ -192,7 +195,9 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
         # Save to pickle
         save_obj([evaluator._predictions,evaluator.focussed_comps,evaluator.related_comps,
             evaluator.unrelated_comps,evaluator.n_comps,evaluator.pred_bboxes_scores,evaluator.unrelated_names,
-            evaluator.focussed_names], 
+            evaluator.focussed_names, evaluator.related_unresolved,
+            evaluator.unrelated_unresolved, evaluator.wide_focus, evaluator.old_related_unresolved,
+            evaluator.old_unrelated_unresolved,evaluator.misboxed_category], 
             predictions_save_path)
 
         # Measure the time only for this worker (before the synchronization barrier)

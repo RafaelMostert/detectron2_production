@@ -51,7 +51,8 @@ class LOFAREvaluator(DatasetEvaluator):
     def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False,
             remove_unresolved=False,
             segmentation_dir='/data1/mostertrij/data/cache/segmentation_maps',
-            kafka_to_lgm=False,component_save_name=None,debug=False, save_predictions=False):
+            kafka_to_lgm=False,component_save_name=None,debug=False, save_predictions=False,
+            cats='spring'):
         """
         Args:
             dataset_name (str): name of the dataset
@@ -79,6 +80,12 @@ class LOFAREvaluator(DatasetEvaluator):
         self.remove_unresolved = remove_unresolved
         self.segmentation_dir = segmentation_dir
         self.debug = debug
+        self.related_unresolved = []
+        self.unrelated_unresolved = []
+        self.wide_focus = []
+        self.old_related_unresolved = []
+        self.old_unrelated_unresolved = []
+        self.cats = cats
 
     def reset(self):
         self._predictions = []
@@ -89,6 +96,13 @@ class LOFAREvaluator(DatasetEvaluator):
         self.focussed_names = []
         self.n_comps = []
         self.pred_bboxes_scores = []
+
+        self.related_unresolved = []
+        self.unrelated_unresolved = []
+        self.wide_focus = []
+        self.old_related_unresolved = []
+        self.old_unrelated_unresolved = []
+
         # -1 unknown, 0  good association, 1 single missing, 2 single
         # overestimated, 3 multi underestimated, 4 multi overestimated
         self.misboxed_category = [] 
@@ -145,6 +159,13 @@ class LOFAREvaluator(DatasetEvaluator):
         self.pred_bboxes_scores = [(image_dict['instances'].get_fields()['pred_boxes'].tensor.numpy(), 
                   image_dict['instances'].get_fields()['scores'].numpy()) 
                  for image_dict in self._predictions]
+        for image_dict in self._predictions:
+            box = image_dict['instances'].get_fields()['pred_boxes'].tensor.numpy()
+            score = image_dict['instances'].get_fields()['scores'].numpy()
+            if len(box) == 0:
+                print("box, score:", box, score)
+                print("image_dict:", image_dict['instances'])
+                #sdfsdf
 
     def evaluate(self):
         # for parallel execution 
@@ -306,7 +327,7 @@ class LOFAREvaluator(DatasetEvaluator):
         t.write(fits_path, format='fits')
 
         print("Plot first 1000 predictions (predictions not aggregated yet)")
-        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(np.array(self.related_comps)[:1000]))),
+        self.plot_predictions("all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))),
                 debug=False, show_second_best=True)
         print("Plot first 1000 final predictions: components should only appear in a single bounding box")
         self.plot_predictions("final_prediction_debug_images",cutout_list=np.array(indices)[:1000], debug=False)
@@ -498,6 +519,18 @@ class LOFAREvaluator(DatasetEvaluator):
         print(f"We have {self.single_comps} single comp cutouts and {self.multi_comps} multi")
 
         # Filter out predicted bboxes that do not cover the focussed pixel
+        """
+        for name, (x, y), (bboxes, scores) in zip(self.focussed_names, self.focussed_comps, self.pred_bboxes_scores):
+            tel = 0
+            for bbox, score in zip(bboxes, scores):
+                if self.is_within(x*scale_factor,y*scale_factor, bbox[0],bbox[1],bbox[2],bbox[3]):
+                    tel+=1
+
+            if tel==0: 
+                print(f"{name}, focussed x,y= {x},{y}, all boxes and scores:",list(zip(bboxes,scores)))
+                sdfsdf
+        """
+
         pred_central_bboxes_scores = [[(tuple(bbox),score) for bbox, score in zip(bboxes, scores) 
                             if self.is_within(x*scale_factor,y*scale_factor, 
                                 bbox[0],bbox[1],bbox[2],bbox[3])] 
@@ -577,14 +610,12 @@ class LOFAREvaluator(DatasetEvaluator):
             self.plot_predictions(f"all_prediction_debug_images",cutout_list=list(range(len(self.related_comps))),
                     debug=False, show_second_best=True)
         # Save predictions, scores and misboxed categories
-        fail_dir = os.path.join(self._output_dir, self._dataset_name+'_'+fail_dir_name)
-        os.makedirs(fail_dir,exist_ok=True)
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
         source_names = [p.split('/')[-1] for p in image_source_paths]
         image_dest_paths = [os.path.join("all_prediction_debug_images", image_source_path.split('/')[-1])
                 for image_source_path in image_source_paths]
-        np.savez(os.path.join(self._output_dir, "prediction_statistics.npz"),
-                self.focussed_names, image_source_paths, image_dest_paths 
+        np.savez(os.path.join(self._output_dir,self._dataset_name + "_prediction_statistics.npz"),
+                self.focussed_names, image_source_paths, image_dest_paths,
                 self.pred_central_bboxes_scores,
                 self.second_best, self.misboxed_category)
 
@@ -594,8 +625,6 @@ class LOFAREvaluator(DatasetEvaluator):
             lgm_to_kafka=False, show_second_best=False):
         """Collect ground truth bounding boxes that fail to encapsulate the ground truth pybdsf
         components so that they can be inspected to improve the box-draw-process"""
-        #TODO: remove temporary debug return
-        return
         #if (self._dataset_name not in [ 'test', 'val','inference']) or cutout_list is None:
         #    return
         from cv2 import imread
@@ -627,9 +656,19 @@ class LOFAREvaluator(DatasetEvaluator):
 
         if debug:
             try:
-                vac = pd.read_hdf('/home/rafael/data/mostertrij/data/catalogues/LOFAR_HBA_T1_DR1_merge_ID_optical_f_v1.2.h5')
-                comp_cat = pd.read_hdf('/home/rafael/data/mostertrij/data/catalogues/LOFAR_HBA_T1_DR1_merge_ID_v1.2.comp.h5')
-                comp_dict = {s:idx for s, idx in zip(comp_cat.Component_Name.values,comp_cat.Source_Name.values)}
+                if self.cats == 'dr1':
+                    vac_path = '/home/rafael/data/mostertrij/data/catalogues/LOFAR_HBA_T1_DR1_merge_ID_optical_f_v1.2.h5'
+                    comp_path = '/home/rafael/data/mostertrij/data/catalogues/LOFAR_HBA_T1_DR1_merge_ID_v1.2.comp.h5'
+                    skey = 'Source_Name'
+                elif self.cats == 'spring':
+                    vac_path = '/data1/mostertrij/data/catalogues/Spring-60-65/sources-v0.5.h5'
+                    comp_path = '/data1/mostertrij/data/catalogues/Spring-60-65/components-v0.5.h5'
+                    skey = 'Parent_Source'
+
+                vac = pd.read_hdf(vac_path)
+                comp_cat = pd.read_hdf(comp_path)
+
+                comp_dict = {s:idx for s, idx in zip(comp_cat.Component_Name.values,comp_cat[skey].values)}
                 vac_dict = {s:idx for s, idx in zip(vac.Source_Name.values,vac.index.values)}   
             except:
                 pass
@@ -699,7 +738,11 @@ class LOFAREvaluator(DatasetEvaluator):
                 # Plot optical
                 plot_optical=False
                 if plot_optical:
-                    for w,x,y in zip(cutout.optical_sources['w1Mag'], 
+                    if 'w1Mag' in cutout.optical_sources.keys():
+                        okey = 'w1Mag'
+                    else:
+                        okey = 'MAG_W1'
+                    for w,x,y in zip(cutout.optical_sources[okey], 
                             cutout.optical_sources['x'],cutout.optical_sources['y']):
                         if not np.isnan(w):
                             marker='+'
@@ -752,8 +795,16 @@ class LOFAREvaluator(DatasetEvaluator):
                 #if not show_second_best:
                 #    ax1.axes.xaxis.set_visible(False)
                 #    ax1.axes.yaxis.set_visible(False)    
+                d = 40
+                ticks = np.arange(0,201,d)
+                ax1.set_xticks(ticks)
+                ax1.set_yticks(ticks)
+                ax1.set_xticklabels([f'{t*1.5/60:.0f}' for t in ticks])
+                ax1.set_yticklabels([f'{t*1.5/60:.0f}' for t in ticks])
                 ax1.set_xlim(0,200)
                 ax1.set_ylim(200,0)
+                ax1.set_xlabel('arcmin')
+                ax1.set_ylabel('arcmin')
                 # Save and close plot
                 plt.savefig(dest, bbox_inches='tight')
                 plt.close()

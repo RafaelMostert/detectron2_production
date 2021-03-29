@@ -35,7 +35,7 @@ assert len(argv) > 1, "Insert path of configuration file when executing this scr
 cfg = get_cfg()
 cfg.merge_from_file(argv[1])
 lotss_dr2_path = '/data/mostertrij/data/catalogues/LoTSS_DR2_v100.srl.h5'
-if len(argv) == 3:
+if len(argv) > 2:
     start_dir = argv[2]
     print("Beginning of paths:", start_dir)
     cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
@@ -44,6 +44,8 @@ if len(argv) == 3:
     lotss_dr2_path = lotss_dr2_path.replace("/data/mostertrij",start_dir)
 assert os.path.exists(lotss_dr2_path), lotss_dr2_path
 print(f"Loaded configuration file {argv[1]}")
+model_path = argv[3]
+print(f"Model path used for inference {model_path}")
 DATASET_PATH= cfg.DATASET_PATH
 print(f"Experiment: {cfg.EXPERIMENT_NAME}")
 print(f"Rotation enabled: {cfg.INPUT.ROTATION_ENABLED}")
@@ -72,7 +74,7 @@ def get_lofar_dicts(annotation_filepath):
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
 
         if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
-            if len(argv) == 3:
+            if len(argv) > 2:
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data2/mostertrij",start_dir)
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
@@ -83,8 +85,8 @@ def get_lofar_dicts(annotation_filepath):
 
 # Register data inside detectron
 # With DATASET_SIZES one can limit the size of these datasets
-d = "inference"
-inference_dict = get_lofar_dicts(os.path.join(DATASET_PATH,"VIA_json_inference.pkl")) 
+d = cfg.DATASETS.TEST[0]
+inference_dict = get_lofar_dicts(os.path.join(DATASET_PATH,f"VIA_json_{d}.pkl")) 
 DatasetCatalog.register(d, lambda d=d: inference_dict)
 MetadataCatalog.get(d).set(thing_classes=["radio_source"])
 lofar_metadata = MetadataCatalog.get(d)
@@ -116,7 +118,8 @@ for i, dic in enumerate(random.sample(inference_dict, 3)):
 #pretrained_model_path = "/data/mostertrij/tridentnet/output/v4_all_withRot/model_0059999.pth".replace('/data/mostertrij',start_dir)
 #pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
 #pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
-pretrained_model_path = "/data/mostertrij/tridentnet/output/uLB300_precomputed_removed_withRot_constantLR_seed1/model_0009999.pth".replace('/data/mostertrij',start_dir)
+#pretrained_model_path = "/data/mostertrij/tridentnet/output/uLB300_precomputed_removed_withRot_constantLR_seed1/model_0009999.pth".replace('/data/mostertrij',start_dir)
+pretrained_model_path = model_path.replace('/data/mostertrij',start_dir)
 print("Load model:", pretrained_model_path)
 cfg.MODEL.WEIGHTS = os.path.join(pretrained_model_path)  # path to the model we just trained
 trainer = LOFARTrainer(cfg) 

@@ -99,7 +99,8 @@ def get_lofar_dicts(annotation_filepath):
     return new_data
 
 # Register data inside detectron
-for d in ["train", "val", "test"]:
+#for d in ["train", "val", "test"]:
+for d in list(cfg.DATASETS.TEST):
     DatasetCatalog.register(d, 
                             lambda d=d:
                             get_lofar_dicts(os.path.join(
@@ -121,7 +122,8 @@ trainer = LOFARTrainer(cfg)
 os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
 trainer.resume_or_load(resume=True)
 
-for d in ["train", "val", "test"]:
+#for d in ["train", "val", "test"]:
+for d in list(cfg.DATASETS.TEST):
     print(f"For {d} set:")
     print('Load inference loader.')
     inference_loader = build_detection_test_loader(cfg, d)
