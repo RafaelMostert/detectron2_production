@@ -48,4 +48,4 @@ wheels/
 
 # log dirs
 /configs/lofar_detection/old
-/run/old
+/runs/old
