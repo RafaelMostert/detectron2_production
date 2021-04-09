@@ -45,3 +45,7 @@ wheels/
 /datasets
 /projects/*/datasets
 /models
+
+# log dirs
+/configs/lofar_detection/old
+/run/old
