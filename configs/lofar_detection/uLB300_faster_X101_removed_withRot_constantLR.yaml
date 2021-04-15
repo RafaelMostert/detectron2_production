@@ -1,5 +1,5 @@
-_BASE_: "base_lofar_faster_rcnn_R50-FPN.yaml"
-OUTPUT_DIR: "/data/mostertrij/tridentnet/output/uLB300_faster_R50_removed_withRot_constantLR/"
+_BASE_: "base_lofar_faster_rcnn_X101-FPN.yaml"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/uLB300_faster_X101_removed_withRot_constantLR/"
 DATASETS:
   TRAIN: ("train",)
   TEST: ("train","val","test")

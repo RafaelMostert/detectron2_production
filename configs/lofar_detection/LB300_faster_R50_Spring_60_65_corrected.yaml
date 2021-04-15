@@ -1,0 +1,17 @@
+_BASE_: "base_lofar_faster_rcnn_R50-FPN.yaml"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/LB300_Spring-60-65-corrected_faster_R50_removed_withRot_constantLR/"
+DATASET_PATH: "/data/mostertrij/data/frcnn_images/LB300_Spring-60-65-corrected_precomputed_removed/LGZ_COCOstyle/annotations/"
+DATASETS:
+  TRAIN: ("train",)
+  TEST: ("train",)
+INPUT:
+  ROTATION_ENABLED: True
+SOLVER:
+  #LR_SCHEDULER_NAME:  "WarmupCosineLR" 
+  STEPS: ()
+  MAX_ITER: 50000 
+  CHECKPOINT_PERIOD: 10000
+TEST:
+  REMOVE_UNRESOLVED: True
+  REMOVE_THRESHOLD: ("0.20") # Needs to be a string
+  EVAL_PERIOD: 10000

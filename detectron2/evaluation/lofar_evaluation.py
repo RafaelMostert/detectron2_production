@@ -162,10 +162,10 @@ class LOFAREvaluator(DatasetEvaluator):
         for image_dict in self._predictions:
             box = image_dict['instances'].get_fields()['pred_boxes'].tensor.numpy()
             score = image_dict['instances'].get_fields()['scores'].numpy()
-            if len(box) == 0:
-                print("box, score:", box, score)
-                print("image_dict:", image_dict['instances'])
-                #sdfsdf
+            #if len(box) == 0:
+            #    print("box, score:", box, score)
+            #    print("image_dict:", image_dict['instances'])
+            #    sdfsdf
 
     def evaluate(self):
         # for parallel execution 
