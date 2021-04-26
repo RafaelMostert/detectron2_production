@@ -129,7 +129,7 @@ for d in list(cfg.DATASETS.TEST):
     inference_loader = build_detection_test_loader(cfg, d)
     print('Load LOFAR evaluator.')
     evaluator = LOFAREvaluator(d, cfg.OUTPUT_DIR, distributed=True, inference_only=False,
-            remove_unresolved=cfg.TEST.REMOVE_UNRESOLVED,
+            remove_unresolved=cfg.TEST.REMOVE_UNRESOLVED,sigmabox=cfg.SIGMABOX,
             segmentation_dir=f'/data1/mostertrij/data/cache/segmentation_maps_{cfg.TEST.REMOVE_THRESHOLD}',
             save_predictions=True, kafka_to_lgm=False,component_save_name="bare_predicted_component_catalogue")
     print('Start inference on dataset to get evaluation.')

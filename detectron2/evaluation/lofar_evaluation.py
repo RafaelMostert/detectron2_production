@@ -49,7 +49,7 @@ class LOFAREvaluator(DatasetEvaluator):
     """
 
     def __init__(self, dataset_name, output_dir, distributed=True, inference_only=False,
-            remove_unresolved=False,
+            remove_unresolved=False, sigmabox=5,
             segmentation_dir='/data1/mostertrij/data/cache/segmentation_maps',
             kafka_to_lgm=False,component_save_name=None,debug=False, save_predictions=False,
             cats='spring'):
@@ -86,6 +86,7 @@ class LOFAREvaluator(DatasetEvaluator):
         self.old_related_unresolved = []
         self.old_unrelated_unresolved = []
         self.cats = cats
+        self.sigmabox = sigmabox
 
     def reset(self):
         self._predictions = []
@@ -382,7 +383,7 @@ class LOFAREvaluator(DatasetEvaluator):
                 unrelated_resolved_in_predicted_bboxes.append([[],[]])
 
         # If so proceed with following actions.
-        segmentation_paths = [os.path.join(self.segmentation_dir, f"{s}_{imsize}.pkl")
+        segmentation_paths = [os.path.join(self.segmentation_dir, f"{s}_{imsize}_{self.sigmabox}sigma.pkl")
                 for s in self.focussed_names]
         new_rel_unresolved_per_cutout, new_unrel_unresolved_per_cutout = [], []
         for t, (action_needed,  related_comp, unrelated_comp) in \

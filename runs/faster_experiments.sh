@@ -1,7 +1,7 @@
 # When executed, the code below will train our model using a variety of settings and implemented
 # features.
 
-val="uLB300_faster_R50_removed_withRot_constantLR"
+val="uLB300_faster2_R50_removed_withRot_constantLR"
 
 seed=1
 CUDA_VISIBLE_DEVICES=0 python ../train_lofar.py \
