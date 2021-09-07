@@ -46,18 +46,17 @@ parser.add_argument('-o','--overwrite', help='Enabling overwrite will overwrite 
         default=False, action='store_true')
 parser.add_argument('-n','--noises',nargs='+',type=int, help='List of noise sigmas used to augment cutout to resemble fainter sources.',
         default=[0,3,10], dest='noises')
-parser.add_argument('-g','--gaussian-blurs',nargs='+',type=int, help='List of Gaussian kernelsize used to augment cutout to resemble fainter sources.',
-        default=[0,5,15], dest='gaussian_blurs')
+#parser.add_argument('-g','--gaussian-blurs',nargs='+',type=int, help='List of Gaussian kernelsize used to augment cutout to resemble fainter sources.',
+#        default=[0,5,15], dest='gaussian_blurs')
 args = vars(parser.parse_args())
 
 debug = args['debug']
 overwrite = args['overwrite']
-gaussian_blurs = args['gaussian_blurs']
+#gaussian_blurs = args['gaussian_blurs']
 noises = args['noises']
 
 if debug:
-    print("Parsed arguments: Debug:", debug, "overwrite",overwrite, "gaussian_blurs",
-            gaussian_blurs, 'noises', noises)
+    print("Parsed arguments: Debug:", debug, "overwrite",overwrite, 'noises', noises)
 
 if not debug:
     pd.set_option('mode.chained_assignment', None)
@@ -301,6 +300,7 @@ for noise in noises:
 
     # Run PyBDSF on cutout
     augmented_cat_fits_path = os.path.join(data_directory,field,f'augmented_cat_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.fits')
+    augmented_cat_flag_path = os.path.join(data_directory,field,f'augmented_cat_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.flag')
     single_text = f"""
 #Imports
 import bdsf
@@ -317,7 +317,7 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
               format='fits', catalog_type='srl', clobber={overwrite})
     """
                                             
-    if overwrite or not os.path.exists(augmented_cat_fits_path):
+    if overwrite or (not os.path.exists(augmented_cat_fits_path) and not os.path.exists(augmented_cat_flag_path)):
         with open('exec_singularity.py','w') as f:
             f.write(single_text)
         
@@ -339,6 +339,9 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
         print(f"PyBDSF source catalogue was not created for image blurred with {gaussian_blur:.2f}sigma and noise {noise}sigma.")
         print("Because PyBDSF found zero sources, or due to an error in sourcefinding.")
         augmented_cat = pd.DataFrame({'Total_flux':[0]})
+        with open(augmented_cat_flag_path,'w') as f:
+            f.write("")
+
     else:
         augmented_cat = pinklib.postprocessing.fits_catalogue_to_pandas(augmented_cat_fits_path)
         ca = SkyCoord(augmented_cat.RA, augmented_cat.DEC, unit='deg')
