@@ -51,7 +51,9 @@ args = vars(parser.parse_args())
 debug = args['debug']
 overwrite = args['overwrite']
 gaussian_blurs = args['gaussian_blurs']
-print("Parsed arguments: Debug:", debug, "overwrite",overwrite, "gaussian_blurs", gaussian_blurs)
+
+if debug:
+    print("Parsed arguments: Debug:", debug, "overwrite",overwrite, "gaussian_blurs", gaussian_blurs)
 
 if not debug:
     pd.set_option('mode.chained_assignment', None)
@@ -242,17 +244,18 @@ if debug:
 
 original_flux = cutout_cat.Total_flux.sum()
 stats = pd.DataFrame({'Cat':['Original'],
-                      'Total flux (mJy)':[original_flux],
+                      'Detected sources':[len(cutout_cat)],
+                      'Linked sources':[len(cutout_cat)],
+                     'Unassociated sources':[0],
+                      'Detected flux (mJy)':[original_flux],
                       'Linked flux (mJy)':[np.nan],
+                    'Unassociated flux (mJy)':[np.nan],
                       'Linked flux fraction':[np.nan],
-                     'Unassociated flux (mJy):':[np.nan],
-                     'Unassociated flux fraction':[np.nan],
-                     '# of unassociated sources':[0]})
+                     'Unassociated flux fraction':[np.nan]})
 
 # For all augmentations repeat this loop
 
 for gaussian_blur in gaussian_blurs:
-    print(f"Proceeding with gaussian blur {gaussian_blur} of type {type(gaussian_blur)} and shape {np.shape(gaussian_blur)}")
     plt.close("all")
     ## Augment cutout
     img = subimage.data
@@ -312,87 +315,105 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
     #iv) If multiple matches are found, link the flux to the source in A* to the matched one in A that is closest in terms of RA,DEC.
 
     # Load cat for augmented image
-    augmented_cat = pinklib.postprocessing.fits_catalogue_to_pandas(augmented_cat_fits_path)
-    ca = SkyCoord(augmented_cat.RA, augmented_cat.DEC, unit='deg')
-    ca_pixels = skycoord_to_pixel(ca,subimage.wcs, origin=0)
+    if not os.path.exists(augmented_cat_fits_path):
+        print("PyBDSF source catalogue was not created for image blurred with {gaussian_blur}sigma Gaussian kernel.")
+        print("Because PyBDSF found zero sources, or due to an error in sourcefinding.")
+        augmented_cat = pd.DataFrame({'Total_flux':[0]})
+    else:
+        augmented_cat = pinklib.postprocessing.fits_catalogue_to_pandas(augmented_cat_fits_path)
+        ca = SkyCoord(augmented_cat.RA, augmented_cat.DEC, unit='deg')
+        ca_pixels = skycoord_to_pixel(ca,subimage.wcs, origin=0)
 
-    if debug:
-        ## Plot cutout
-        fig,ax = pinklib.postprocessing.plot_cutout2D(augmented_img, wcs=subimage.wcs, sqrt=True,
-                                             colorbar=True,cmap='magma', return_fig=True);
-    # Plot sources in vac and newly found sources
-    es = []
-    for i, (x,y, l,w,pa) in enumerate(zip(*pixels,
-                                                 cutout_cat.source_length, 
-                                    cutout_cat.source_width,
-                                   cutout_cat.source_PA)):
         if debug:
-            ax.plot(x,y,'k', linestyle=None,marker='x',markersize=15)
-            ax.text(x-15,y,len(pixels[0])-i,c='k',fontsize=15) #shadow
+            ## Plot cutout
+            fig,ax = pinklib.postprocessing.plot_cutout2D(augmented_img, wcs=subimage.wcs, sqrt=True,
+                                                 colorbar=True,cmap='magma', return_fig=True);
+        # Plot sources in vac and newly found sources
+        es = []
+        for i, (x,y, l,w,pa) in enumerate(zip(*pixels,
+                                                     cutout_cat.source_length, 
+                                        cutout_cat.source_width,
+                                       cutout_cat.source_PA)):
+            if debug:
+                ax.plot(x,y,'k', linestyle=None,marker='x',markersize=15)
+                ax.text(x-15,y,len(pixels[0])-i,c='k',fontsize=15) #shadow
 
-        e = Ellipse((x,y),l,w,angle=pa-90, linewidth=2, edgecolor='k',facecolor='none')
-        es.append(e)
-    matches = [[] for e in es]
-    for i, e in enumerate(es):
-        #print(e.contains_points(list(zip(*ca_pixels))))
-        for j, (x,y) in enumerate(zip(*ca_pixels)):
-            if e.contains_point([x,y]):
-                matches[i].append(j)
-        if debug:
-            ax.add_patch(e)   
-    matches = np.array(matches)
+            e = Ellipse((x,y),l,w,angle=pa-90, linewidth=2, edgecolor='k',facecolor='none')
+            es.append(e)
+        matches = [[] for e in es]
+        for i, e in enumerate(es):
+            #print(e.contains_points(list(zip(*ca_pixels))))
+            for j, (x,y) in enumerate(zip(*ca_pixels)):
+                if e.contains_point([x,y]):
+                    matches[i].append(j)
+            if debug:
+                ax.add_patch(e)   
+        matches = np.array(matches)
 
-    ##### Remove duplicate matches
-    len_matches = [len(l) for l in matches]
-    len_matches_ranked = np.argsort(len_matches)
-    c = Counter(list(pinklib.postprocessing.flatten(matches)))
-    new_matches = [[] for e in es]
+        ##### Remove duplicate matches
+        len_matches = [len(l) for l in matches]
+        len_matches_ranked = np.argsort(len_matches)
+        c = Counter(list(pinklib.postprocessing.flatten(matches)))
+        new_matches = [[] for e in es]
 
-    dups = []
-    for i, m in enumerate(matches[len_matches_ranked]):
-        for mm in m:
-            if c[mm] < 2:
-                new_matches[i].append(mm)
-                dups.append(mm)
-            else:
-                if not mm in dups:
+        dups = []
+        for i, m in enumerate(matches[len_matches_ranked]):
+            for mm in m:
+                if c[mm] < 2:
                     new_matches[i].append(mm)
                     dups.append(mm)
-    new_matches = np.array(new_matches)
-    unique_matches = list(set(pinklib.postprocessing.flatten(new_matches)))
-    print("heyho: new_matches", new_matches, "unique_matches", unique_matches)
+                else:
+                    if not mm in dups:
+                        new_matches[i].append(mm)
+                        dups.append(mm)
+        new_matches = np.array(new_matches)
+        unique_matches = list(set(pinklib.postprocessing.flatten(new_matches)))
+        #print("heyho: new_matches", new_matches, "unique_matches", unique_matches)
 
 
 
-    ################ Visualization
-    if debug:
-        for i, (x,y) in enumerate(zip(*ca_pixels)):
-            ax.plot(x,y,'w', linestyle=None,marker='+')
-            ax.text(x+5,y,i,c='k',fontsize=25) #shadow
-            ax.text(x+4,y,i,c='w',fontsize=25)
-        # Show matches as similarly colored
-        prop_cycle = plt.rcParams['axes.prop_cycle']
-        colors = prop_cycle.by_key()['color']
-        for i, m in enumerate(new_matches):
-            for mm in m:
-                ax.plot(ca_pixels[0][mm],ca_pixels[1][mm],c=colors[i%10], linestyle='None',
-                        marker='+',markersize=15)
-                ax.text(ca_pixels[0][mm]+5,ca_pixels[1][mm],f'{mm}_{i}',c='k',fontsize=25) #shadow
-                ax.text(ca_pixels[0][mm]+4,ca_pixels[1][mm],f'{mm}_{i}',c=colors[i%10],fontsize=25)
-        plt.title('Black ellipses show sources in final \nDR1 value-added catalogue.' \
-             '\n White \'+\'-markers show sources found in noisified \nimage by PyBDSF.')
-        plt.show()
-    print("We found the following matches:", unique_matches)
+        ################ Visualization
+        if debug:
+            for i, (x,y) in enumerate(zip(*ca_pixels)):
+                ax.plot(x,y,'w', linestyle=None,marker='+')
+                ax.text(x+5,y,i,c='k',fontsize=25) #shadow
+                ax.text(x+4,y,i,c='w',fontsize=25)
+            # Show matches as similarly colored
+            prop_cycle = plt.rcParams['axes.prop_cycle']
+            colors = prop_cycle.by_key()['color']
+            for i, m in enumerate(new_matches):
+                for mm in m:
+                    ax.plot(ca_pixels[0][mm],ca_pixels[1][mm],c=colors[i%10], linestyle='None',
+                            marker='+',markersize=15)
+                    ax.text(ca_pixels[0][mm]+5,ca_pixels[1][mm],f'{mm}_{i}',c='k',fontsize=25) #shadow
+                    ax.text(ca_pixels[0][mm]+4,ca_pixels[1][mm],f'{mm}_{i}',c=colors[i%10],fontsize=25)
+            plt.title('Black ellipses show sources in final \nDR1 value-added catalogue.' \
+                 '\n White \'+\'-markers show sources found in noisified \nimage by PyBDSF.')
+            plt.show()
+        if debug:
+            print("We found the following matches:", unique_matches)
 
     if not unique_matches:
         print("No matches found in original sourcelist and sourcelist of augmented cutout.")
-        stats = stats.append({'Cat':f'Blurred by {gaussian_blur} sigma',
-                          'Total flux (mJy)':augmented_cat.Total_flux.sum()*1000,
+        stats = stats.append({'Cat':f'{gaussian_blur} sigma blur',
+                          'Detected sources':len(augmented_cat),
+                          'Detected flux (mJy)':augmented_cat.Total_flux.sum()*1000,
+                          'Linked sources':0,
                           'Linked flux (mJy)':0,
                           'Linked flux fraction':0,
+                          'Unassociated sources':int(len(augmented_cat)),
                          'Unassociated flux (mJy)':augmented_cat.Total_flux.sum()*1000,
-                         'Unassociated flux fraction':augmented_cat.Total_flux.sum()*1000/original_flux,
-                         '# of unassociated sources':int(len(augmented_cat))},ignore_index=True)
+                         'Unassociated flux fraction':augmented_cat.Total_flux.sum()*1000/original_flux},ignore_index=True)
+    elif not os.path.exists(augmented_cat_fits_path):
+        stats = stats.append({'Cat':f'{gaussian_blur} sigma blur',
+                          'Detected sources':0,
+                          'Detected flux (mJy)':0,
+                          'Linked sources':0,
+                          'Linked flux (mJy)':0,
+                          'Linked flux fraction':0,
+                          'Unassociated sources':0,
+                         'Unassociated flux (mJy)':0,
+                         'Unassociated flux fraction':0},ignore_index=True)
 
     else:
         comp_keys = ['Source_Name', 'RA', 'E_RA', 'DEC', 'E_DEC', 'Peak_flux',
@@ -419,7 +440,7 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
         compdata = []
         for irow, clist in enumerate(clists):
             #clist = clist_series.to_dict('records')
-            print('irow',type(irow),np.shape(irow), irow, 'clist',type(clist), np.shape(clist), clist)
+            #print('irow',type(irow),np.shape(irow), irow, 'clist',type(clist), np.shape(clist), clist)
             ms=Make_Shape(clist)
             r = {}
             r['Predicted_Size']=ms.length()
@@ -484,14 +505,20 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
         # Write up the statistics/results
         ii = [i for i in augmented_cat.index if not i in unique_matches]
         unassoc_cat = augmented_cat.iloc[ii]
+        #print('unique matches', unique_matches, "augmented cat", augmented_cat)
+        #print('unassoc_cat', unassoc_cat, "total", unassoc_cat.Total_flux.sum()*1000)
         original_flux = cutout_cat.Total_flux.sum()
-        stats = stats.append({'Cat':f'Blurred by {gaussian_blur} sigma',
-                              'Total flux (mJy)':augmented_cat.Total_flux.sum()*1000,
+        stats = stats.append({'Cat':f'{gaussian_blur} sigma blur',
+                              'Detected sources':len(augmented_cat),
+                              'Detected flux (mJy)':augmented_cat.Total_flux.sum()*1000,
+                              'Linked sources':len(retrieved_component_cat),
                               'Linked flux (mJy)':retrieved_source_cat.Total_flux.sum()*1000,
                               'Linked flux fraction':retrieved_source_cat.Total_flux.sum()*1000/original_flux,
+                              'Unassociated sources':int(len(unassoc_cat)),
                              'Unassociated flux (mJy)':unassoc_cat.Total_flux.sum()*1000,
-                             'Unassociated flux fraction':unassoc_cat.Total_flux.sum()*1000/original_flux,
-                             '# of unassociated sources':int(len(unassoc_cat))},ignore_index=True)
+                             'Unassociated flux fraction':unassoc_cat.Total_flux.sum()*1000/original_flux},ignore_index=True)
 
-stats['# of unassociated sources'] = stats['# of unassociated sources'].astype(int)
+stats['Detected sources'] = stats['Detected sources'].astype(int)
+stats['Linked sources'] = stats['Linked sources'].astype(int)
+stats['Unassociated sources'] = stats['Unassociated sources'].astype(int)
 print(stats)
