@@ -44,6 +44,8 @@ parser.add_argument('-d','--debug', help='Enabling debug will render debug outpu
         dest='debug', action='store_true', default=False)
 parser.add_argument('-o','--overwrite', help='Enabling overwrite will overwrite pybdsf catalog for augmented cutouts.',
         default=False, action='store_true')
+parser.add_argument('-n','--noises',nargs='+',type=int, help='List of noise sigmas used to augment cutout to resemble fainter sources.',
+        default=[0,3,10], dest='noises')
 parser.add_argument('-g','--gaussian-blurs',nargs='+',type=int, help='List of Gaussian kernelsize used to augment cutout to resemble fainter sources.',
         default=[0,5,15], dest='gaussian_blurs')
 args = vars(parser.parse_args())
@@ -51,9 +53,11 @@ args = vars(parser.parse_args())
 debug = args['debug']
 overwrite = args['overwrite']
 gaussian_blurs = args['gaussian_blurs']
+noises = args['noises']
 
 if debug:
-    print("Parsed arguments: Debug:", debug, "overwrite",overwrite, "gaussian_blurs", gaussian_blurs)
+    print("Parsed arguments: Debug:", debug, "overwrite",overwrite, "gaussian_blurs",
+            gaussian_blurs, 'noises', noises)
 
 if not debug:
     pd.set_option('mode.chained_assignment', None)
@@ -184,7 +188,10 @@ LoTSS_field_path = os.path.join(data_directory, field, fits_filename)
 image, hdr = pinklib.postprocessing.load_fits(LoTSS_field_path, dimensions_normal=True)
 wcs = WCS(hdr,naxis=2)
 restfreq = hdr['RESTFRQ']
-angular_resolution_LoTSS = abs(hdr['CDELT1'])*3600
+angular_resolution = abs(hdr['CDELT1'])*3600
+beam_size_in_arcsec = 6
+# Calculate size of Gaussian kernel
+gaussian_blur = pinklib.postprocessing.FWHM_to_sigma_for_gaussian(beam_size_in_arcsec*angular_resolution)
 
 
 # Load single field cat
@@ -197,11 +204,11 @@ width_in_arcsec = 8*60
 subimage = pinklib.postprocessing.make_numpy_cutout_from_fits(
     width_in_arcsec, width_in_arcsec, loc.ra, loc.dec,
  LoTSS_field_path, dimensions_normal=True, just_data=False,
-    arcsec_per_pixel=angular_resolution_LoTSS)
+    arcsec_per_pixel=angular_resolution)
 bb = subimage.bbox_original
 if debug:
     print(f'Restfrequency in Hz:', int(restfreq))
-    print(f'Angular resolution: {angular_resolution_LoTSS:.2f} arcsec/pixels')
+    print(f'Angular resolution: {angular_resolution:.2f} arcsec/pixels')
     print(f'Cutout shape: {np.shape(subimage.data)} pixels')
 w,h = np.shape(subimage.data)
 ## Get ra, dec extent of cutout
@@ -255,12 +262,25 @@ stats = pd.DataFrame({'Cat':['Original'],
 
 # For all augmentations repeat this loop
 
-for gaussian_blur in gaussian_blurs:
+for noise in noises:
+    augmented_cat=pd.DataFrame()
+    unassoc_cat=pd.DataFrame()
+    retrieved_component_cat=pd.DataFrame()
+    retrieved_source_cat=pd.DataFrame()
     plt.close("all")
     ## Augment cutout
     img = subimage.data
-    augmented_img = gaussian_filter(img, sigma=gaussian_blur)
-    augmented_cutout_filename = f'augmented_cutout_blurred{gaussian_blur}sigma.fits'
+    normal = np.random.normal(0, np.std(img), np.shape(img))
+
+    if noise > 0:
+        gaussian_blur = pinklib.postprocessing.FWHM_to_sigma_for_gaussian(beam_size_in_arcsec*angular_resolution)
+        #augmented_img = img + noise*normal
+        #augmented_img = gaussian_filter(augmented_img, sigma=gaussian_blur)
+        augmented_img = img + gaussian_filter(noise*normal, sigma=gaussian_blur)
+    else:
+        gaussian_blur=0
+        augmented_img = img
+    augmented_cutout_filename = f'augmented_cutout_blurred{gaussian_blur:.2f}sigma_noise{noise}sigma.fits'
     # Write the cutout to a new FITS file
     hdr.update(subimage.wcs.to_header())
     fits.writeto(augmented_cutout_filename, augmented_img, hdr,overwrite=True)
@@ -276,11 +296,11 @@ for gaussian_blur in gaussian_blurs:
             ax.plot(x,y,'w', linestyle=None,marker='x')
             ax.text(x+5,y,i,c='k',fontsize=15) #shadow
             ax.text(x+4,y,i,c='w',fontsize=15)
-            ax.set_title(f"Cutout blurred with {gaussian_blur}sigma Gaussian kernel")
+            ax.set_title(f"Cutout blurred {gaussian_blur:.2f}sigma, noise {noise}sigma")
         plt.show()
 
     # Run PyBDSF on cutout
-    augmented_cat_fits_path = os.path.join(data_directory,field,f'augmented_cat_blurred{gaussian_blur}sigma.fits')
+    augmented_cat_fits_path = os.path.join(data_directory,field,f'augmented_cat_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.fits')
     single_text = f"""
 #Imports
 import bdsf
@@ -316,7 +336,7 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
 
     # Load cat for augmented image
     if not os.path.exists(augmented_cat_fits_path):
-        print("PyBDSF source catalogue was not created for image blurred with {gaussian_blur}sigma Gaussian kernel.")
+        print(f"PyBDSF source catalogue was not created for image blurred with {gaussian_blur:.2f}sigma and noise {noise}sigma.")
         print("Because PyBDSF found zero sources, or due to an error in sourcefinding.")
         augmented_cat = pd.DataFrame({'Total_flux':[0]})
     else:
@@ -395,7 +415,7 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
 
     if not unique_matches:
         print("No matches found in original sourcelist and sourcelist of augmented cutout.")
-        stats = stats.append({'Cat':f'{gaussian_blur} sigma blur',
+        stats = stats.append({'Cat':f'{gaussian_blur:.2f} sigma blur, {noise} sigma noise',
                           'Detected sources':len(augmented_cat),
                           'Detected flux (mJy)':augmented_cat.Total_flux.sum()*1000,
                           'Linked sources':0,
@@ -405,7 +425,7 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
                          'Unassociated flux (mJy)':augmented_cat.Total_flux.sum()*1000,
                          'Unassociated flux fraction':augmented_cat.Total_flux.sum()*1000/original_flux},ignore_index=True)
     elif not os.path.exists(augmented_cat_fits_path):
-        stats = stats.append({'Cat':f'{gaussian_blur} sigma blur',
+        stats = stats.append({'Cat':f'{gaussian_blur:.2f} sigma blur, {noise} sigma noise',
                           'Detected sources':0,
                           'Detected flux (mJy)':0,
                           'Linked sources':0,
@@ -508,7 +528,7 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
         #print('unique matches', unique_matches, "augmented cat", augmented_cat)
         #print('unassoc_cat', unassoc_cat, "total", unassoc_cat.Total_flux.sum()*1000)
         original_flux = cutout_cat.Total_flux.sum()
-        stats = stats.append({'Cat':f'{gaussian_blur} sigma blur',
+        stats = stats.append({'Cat':f'{gaussian_blur:.2f} sigma blur, {noise} sigma noise',
                               'Detected sources':len(augmented_cat),
                               'Detected flux (mJy)':augmented_cat.Total_flux.sum()*1000,
                               'Linked sources':len(retrieved_component_cat),
