@@ -45,7 +45,7 @@ parser.add_argument('-d','--debug', help='Enabling debug will render debug outpu
 parser.add_argument('-o','--overwrite', help='Enabling overwrite will overwrite pybdsf catalog for augmented cutouts.',
         default=False, action='store_true')
 parser.add_argument('-n','--noises',nargs='+',type=int, help='List of noise sigmas used to augment cutout to resemble fainter sources.',
-        default=[0,3,10], dest='noises')
+        default=[0,5,10,30,50], dest='noises')
 #parser.add_argument('-g','--gaussian-blurs',nargs='+',type=int, help='List of Gaussian kernelsize used to augment cutout to resemble fainter sources.',
 #        default=[0,5,15], dest='gaussian_blurs')
 args = vars(parser.parse_args())
@@ -54,6 +54,9 @@ debug = args['debug']
 overwrite = args['overwrite']
 #gaussian_blurs = args['gaussian_blurs']
 noises = args['noises']
+assuming_output_in_deg =True
+print("Assuming sizes in generated PyBDSF cat is in degree and converting it to arcsec:",
+        assuming_output_in_deg)
 
 if debug:
     print("Parsed arguments: Debug:", debug, "overwrite",overwrite, 'noises', noises)
@@ -279,7 +282,7 @@ for noise in noises:
     else:
         gaussian_blur=0
         augmented_img = img
-    augmented_cutout_filename = f'augmented_cutout_blurred{gaussian_blur:.2f}sigma_noise{noise}sigma.fits'
+    augmented_cutout_filename = os.path.join(data_directory,field,f'augmented_cutout_blurred{gaussian_blur:.2f}sigma_noise{noise}sigma.fits')
     # Write the cutout to a new FITS file
     hdr.update(subimage.wcs.to_header())
     fits.writeto(augmented_cutout_filename, augmented_img, hdr,overwrite=True)
@@ -300,6 +303,7 @@ for noise in noises:
 
     # Run PyBDSF on cutout
     augmented_cat_fits_path = os.path.join(data_directory,field,f'augmented_cat_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.fits')
+    augmented_gaus_fits_path = os.path.join(data_directory,field,f'augmented_gaus_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.fits')
     augmented_cat_flag_path = os.path.join(data_directory,field,f'augmented_cat_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.flag')
     single_text = f"""
 #Imports
@@ -315,6 +319,8 @@ img = bdsf.process_image('{augmented_cutout_filename}', thresh_isl=4.0, thresh_p
 ## Write the source list catalog.
 img.write_catalog(outfile='{augmented_cat_fits_path}',
               format='fits', catalog_type='srl', clobber={overwrite})
+img.write_catalog(outfile='{augmented_gaus_fits_path}',
+              format='fits', catalog_type='gaul', clobber={overwrite})
     """
                                             
     if overwrite or (not os.path.exists(augmented_cat_fits_path) and not os.path.exists(augmented_cat_flag_path)):
@@ -323,6 +329,7 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
         
         #exec singularity
         call("singularity exec /home/rafael/data/mostertrij/singularity/lofar_sksp_fedora27_ddf_msoverview.sif python exec_singularity.py", shell=True)
+
 
 
     #Linking catalogue A to noisy catalogue A* will proceed as follows:
@@ -343,7 +350,22 @@ img.write_catalog(outfile='{augmented_cat_fits_path}',
             f.write("")
 
     else:
+        # Convert fits to hdf
+        #pinklib.postprocessing.fits_to_hdf(augmented_cat_fits_path, overwrite=overwrite)
+        # Add Mosaic column to hdf5
         augmented_cat = pinklib.postprocessing.fits_catalogue_to_pandas(augmented_cat_fits_path)
+        augmented_cat['Mosaic_ID'] = field
+        augmented_cat['Source_Name'] = augmented_cat.Source_id
+        augmented_gaus = pinklib.postprocessing.fits_catalogue_to_pandas(augmented_gaus_fits_path)
+        augmented_gaus['Mosaic_ID'] = field
+        augmented_gaus['Source_Name'] = augmented_gaus.Source_id
+        if assuming_output_in_deg:
+            augmented_cat['Maj']*=3600
+            augmented_cat['Min']*=3600
+            augmented_gaus['Maj']*=3600
+            augmented_gaus['Min']*=3600
+        augmented_cat.to_hdf(augmented_cat_fits_path.replace('.fits','.h5'),'df')
+        augmented_gaus.to_hdf(augmented_gaus_fits_path.replace('.fits','.h5'),'df')
         ca = SkyCoord(augmented_cat.RA, augmented_cat.DEC, unit='deg')
         ca_pixels = skycoord_to_pixel(ca,subimage.wcs, origin=0)
 
