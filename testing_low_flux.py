@@ -264,6 +264,11 @@ stats = pd.DataFrame({'Cat':['Original'],
 
 # For all augmentations repeat this loop
 
+# Create augment dir
+augment_dir = os.path.join(data_directory, field, 'augmented')
+os.makedirs(augment_dir,exist_ok=True)
+
+
 for noise in noises:
     augmented_cat=pd.DataFrame()
     unassoc_cat=pd.DataFrame()
@@ -282,7 +287,8 @@ for noise in noises:
     else:
         gaussian_blur=0
         augmented_img = img
-    augmented_cutout_filename = os.path.join(data_directory,field,f'augmented_cutout_blurred{gaussian_blur:.2f}sigma_noise{noise}sigma.fits')
+    augment_name = f'augmented_blurred{gaussian_blur:.2f}sigma_noise{noise}sigma'
+    augmented_cutout_filename = os.path.join(data_directory,field,augment_dir,augment_name + '-blanked.fits')
     # Write the cutout to a new FITS file
     hdr.update(subimage.wcs.to_header())
     fits.writeto(augmented_cutout_filename, augmented_img, hdr,overwrite=True)
@@ -302,9 +308,10 @@ for noise in noises:
         plt.show()
 
     # Run PyBDSF on cutout
-    augmented_cat_fits_path = os.path.join(data_directory,field,f'augmented_cat_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.fits')
-    augmented_gaus_fits_path = os.path.join(data_directory,field,f'augmented_gaus_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.fits')
-    augmented_cat_flag_path = os.path.join(data_directory,field,f'augmented_cat_blurred{gaussian_blur:.2f}sigma_noise{noise}_sigma.flag')
+    augmented_cat_fits_path = os.path.join(data_directory,field,augment_dir,augment_name + '.cat.fits')
+    augmented_rms_fits_path = os.path.join(data_directory,field,augment_dir,augment_name + '.rms.fits')
+    augmented_gaus_fits_path = os.path.join(data_directory,field,augment_dir,augment_name + '.gaus.fits')
+    augmented_cat_flag_path = os.path.join(data_directory,field,augment_dir,augment_name + '.cat.flag')
     single_text = f"""
 #Imports
 import bdsf
@@ -315,6 +322,8 @@ img = bdsf.process_image('{augmented_cutout_filename}', thresh_isl=4.0, thresh_p
                          group_tol=10.0, atrous_do=True,atrous_jmax=4, flagging_opts=True, 
                          flag_maxsize_fwhm=0.5,advanced_opts=True, blank_limit=None,
                          frequency={int(restfreq)})
+# Create rms map
+img.export_image(outfile='{augmented_rms_fits_path}',clobber={overwrite}, img_type='rms', img_format='fits')
 # Get PyBDSF cat for cutout
 ## Write the source list catalog.
 img.write_catalog(outfile='{augmented_cat_fits_path}',
