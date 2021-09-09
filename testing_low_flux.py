@@ -288,7 +288,7 @@ for noise in noises:
         gaussian_blur=0
         augmented_img = img
     augment_name = f'augmented_blurred{gaussian_blur:.2f}sigma_noise{noise}sigma'
-    augmented_cutout_filename = os.path.join(data_directory,field,augment_dir,augment_name + '-blanked.fits')
+    augmented_cutout_filename = os.path.join(data_directory,field,augment_dir,augment_name + '.fits')
     # Write the cutout to a new FITS file
     hdr.update(subimage.wcs.to_header())
     fits.writeto(augmented_cutout_filename, augmented_img, hdr,overwrite=True)
