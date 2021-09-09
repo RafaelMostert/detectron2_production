@@ -67,7 +67,7 @@ if not debug:
 # base path
 cat_dir = '/home/rafael/data/mostertrij/data/catalogues'
 # data directory
-data_directory = '/home/rafael/data/mostertrij/data/LoTSS_DR2/RA0h_field/'
+data_directory = '/home/rafael/data/mostertrij/data/LoTSS_DR2/RA13h_field/'
 field = 'P11Hetdex12'
 # comp_path=os.path.join(cat_dir,'LOFAR_HBA_T1_DR1_merge_ID_v1.2.comp.h5')
 # gaul_path=os.path.join(cat_dir,'LOFAR_HBA_T1_DR1_catalog_v0.99.gaus.h5')
