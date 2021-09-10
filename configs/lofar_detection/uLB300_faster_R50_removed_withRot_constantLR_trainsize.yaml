@@ -1,0 +1,14 @@
+_BASE_: "base_lofar_faster_rcnn_R50-FPN.yaml"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/uLB300_faster_R50_removed_withRot_constantLR/"
+DATASETS:
+  TRAIN: ("train",)
+  TEST: ("train","val","test")
+SOLVER:
+  #LR_SCHEDULER_NAME:  "WarmupCosineLR" 
+  STEPS: ()
+  MAX_ITER: 270000 
+  CHECKPOINT_PERIOD: 300000000
+TEST:
+  REMOVE_UNRESOLVED: True
+  REMOVE_THRESHOLD: ("0.20") # Needs to be a string
+  EVAL_PERIOD: 300000000
