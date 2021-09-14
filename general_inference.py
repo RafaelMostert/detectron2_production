@@ -18,6 +18,7 @@ import numpy as np
 from sys import argv
 from cv2 import imread
 import random
+import argparse
 import os
 import pickle
 from operator import itemgetter
@@ -36,14 +37,13 @@ random.seed(5455)
 parser = argparse.ArgumentParser(description="""This script performs part of radio component
 association. Given a PyBDSF source catalogue, generates a source
         catalogue that combines some of the PyBDSF sources into single entries.""")
-parser.add_argument('-d','--debug', help='Enabling debug will render debug output and plots.',
+parser.add_argument('-de','--debug', help='Enabling debug will render debug output and plots.',
         dest='debug', action='store_true', default=False)
 parser.add_argument('-o','--overwrite', help='Enabling overwrite will overwrite the output catalogue.',
         default=False, action='store_true')
 parser.add_argument('-c','--config-file', required=True, help='Path to fast(er) RCNN yaml configuration file.',
-        dest='config')
-parser.add_argument('-s','--source-cat-path', required=True, help='Path to PyBDSF source cat used to
-        which will be used to .',
+        dest='config_file')
+parser.add_argument('-s','--source-cat-path', required=True, help='Path to PyBDSF source cat used to which will be used to .',
         dest='source_cat_path')
 parser.add_argument('-d','--start-dir', help='String that will replace the \/data\/mostertrij part of every in and output path.',
         default='/data/mostertrij', dest='start_dir')
