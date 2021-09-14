@@ -46,12 +46,20 @@ parser.add_argument('-o','--overwrite', help='Enabling overwrite will overwrite 
         default=False, action='store_true')
 parser.add_argument('-n','--noises',nargs='+',type=int, help='List of noise sigmas used to augment cutout to resemble fainter sources.',
         default=[0,5,10,30,50], dest='noises')
+#parser.add_argument('-s','--source-catalogue-path', 
+#        help='Output path of retrieved linked source cat',
+#        default='', dest='source_cat_path')
+#parser.add_argument('-c','--component-catalogue-path', 
+#        help='Output path of retrieved linked component cat',
+#        default='', dest='comp_cat_path')
 #parser.add_argument('-g','--gaussian-blurs',nargs='+',type=int, help='List of Gaussian kernelsize used to augment cutout to resemble fainter sources.',
 #        default=[0,5,15], dest='gaussian_blurs')
 args = vars(parser.parse_args())
 
 debug = args['debug']
 overwrite = args['overwrite']
+#source_cat_path = args['source_cat_path']
+#comp_cat_path = args['comp_cat_path']
 #gaussian_blurs = args['gaussian_blurs']
 noises = args['noises']
 assuming_output_in_deg =True
@@ -288,7 +296,7 @@ for noise in noises:
         gaussian_blur=0
         augmented_img = img
     augment_name = f'augmented_blurred{gaussian_blur:.2f}sigma_noise{noise}sigma'
-    augmented_cutout_filename = os.path.join(data_directory,field,augment_dir,augment_name + '.fits')
+    augmented_cutout_filename = os.path.join(augment_dir,augment_name + '.fits')
     # Write the cutout to a new FITS file
     hdr.update(subimage.wcs.to_header())
     fits.writeto(augmented_cutout_filename, augmented_img, hdr,overwrite=True)
@@ -308,10 +316,10 @@ for noise in noises:
         plt.show()
 
     # Run PyBDSF on cutout
-    augmented_cat_fits_path = os.path.join(data_directory,field,augment_dir,augment_name + '.cat.fits')
-    augmented_rms_fits_path = os.path.join(data_directory,field,augment_dir,augment_name + '.rms.fits')
-    augmented_gaus_fits_path = os.path.join(data_directory,field,augment_dir,augment_name + '.gaus.fits')
-    augmented_cat_flag_path = os.path.join(data_directory,field,augment_dir,augment_name + '.cat.flag')
+    augmented_cat_fits_path = os.path.join(augment_dir,augment_name + '.cat.fits')
+    augmented_rms_fits_path = os.path.join(augment_dir,augment_name + '.rms.fits')
+    augmented_gaus_fits_path = os.path.join(augment_dir,augment_name + '.gaus.fits')
+    augmented_cat_flag_path = os.path.join(augment_dir,augment_name + '.cat.flag')
     single_text = f"""
 #Imports
 import bdsf
@@ -571,6 +579,10 @@ img.write_catalog(outfile='{augmented_gaus_fits_path}',
                               'Unassociated sources':int(len(unassoc_cat)),
                              'Unassociated flux (mJy)':unassoc_cat.Total_flux.sum()*1000,
                              'Unassociated flux fraction':unassoc_cat.Total_flux.sum()*1000/original_flux},ignore_index=True)
+        comp_cat_path = os.path.join(augment_dir,augment_name + '.linked_comp_cat.h5')
+        source_cat_path = os.path.join(augment_dir,augment_name + '.linked_source_cat.h5')
+        retrieved_component_cat.to_hdf(os.path.join(augment_dir, comp_cat_path),'df')
+        retrieved_source_cat.to_hdf(os.path.join(augment_dir, source_cat_path),'df')
 
 stats['Detected sources'] = stats['Detected sources'].astype(int)
 stats['Linked sources'] = stats['Linked sources'].astype(int)
