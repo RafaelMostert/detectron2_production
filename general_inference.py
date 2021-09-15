@@ -39,10 +39,14 @@ association. Given a PyBDSF source catalogue, generates a source
         catalogue that combines some of the PyBDSF sources into single entries.""")
 parser.add_argument('-de','--debug', help='Enabling debug will render debug output and plots.',
         dest='debug', action='store_true', default=False)
+parser.add_argument('-i','--imfiles-path-correct', help='If this flag is used, the image file paths will not be altered',
+        dest='imfiles_correct', action='store_true', default=False)
 parser.add_argument('-o','--overwrite', help='Enabling overwrite will overwrite the output catalogue.',
         default=False, action='store_true')
 parser.add_argument('-c','--config-file', required=True, help='Path to fast(er) RCNN yaml configuration file.',
         dest='config_file')
+parser.add_argument('-da','--data-directory', required=True, help='Path to preprocessed images.',
+        dest='data_dir')
 parser.add_argument('-s','--source-cat-path', required=True, help='Path to PyBDSF source cat used to which will be used to .',
         dest='source_cat_path')
 parser.add_argument('-d','--start-dir', help='String that will replace the \/data\/mostertrij part of every in and output path.',
@@ -54,9 +58,11 @@ parser.add_argument('-m','--model-path', help='Path to trained fast(er) rcnn mod
 args = vars(parser.parse_args())
 
 debug = args['debug']
+imfiles_correct = args['imfiles_correct']
 overwrite = args['overwrite']
 config_file = args['config_file']
 start_dir = args['start_dir']
+data_dir = args['data_dir']
 model_path = args['model_path']
 assuming_output_in_deg =True
 assert len(argv) > 1, "Insert path of configuration file when executing this script"
@@ -64,12 +70,14 @@ cfg = get_cfg()
 cfg.merge_from_file(config_file)
 #source_cat_path = '/data/mostertrij/data/catalogues/LoTSS_DR2_v100.srl.h5'
 source_cat_path = args['source_cat_path']
-if len(argv) > 2:
-    print("Beginning of paths:", start_dir)
-    cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
-    cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
-    cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
-    source_cat_path = source_cat_path.replace("/data/mostertrij",start_dir)
+
+print("Beginning of paths:", start_dir)
+data_dir = os.path.join(data_dir, 'LGZ_COCOstyle/annotations/')
+cfg.DATASET_PATH = data_dir.replace("/data/mostertrij",start_dir)
+cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
+cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
+source_cat_path = source_cat_path.replace("/data/mostertrij",start_dir)
+
 assert os.path.exists(source_cat_path), source_cat_path
 print(f"Loaded configuration file {argv[1]}")
 print(f"Model path used for inference {model_path}")
@@ -101,7 +109,7 @@ def get_lofar_dicts(annotation_filepath):
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
 
         if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
-            if len(argv) > 2:
+            if not imfiles_correct:
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data2/mostertrij",start_dir)
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace("/data/mostertrij",start_dir)
             new_data.append(dataset_dicts[i])
@@ -113,6 +121,8 @@ def get_lofar_dicts(annotation_filepath):
 # Register data inside detectron
 # With DATASET_SIZES one can limit the size of these datasets
 d = cfg.DATASETS.TEST[0]
+print("Test dataset:",d)
+print("inference dict",os.path.join(DATASET_PATH,f"VIA_json_{d}.pkl"))
 inference_dict = get_lofar_dicts(os.path.join(DATASET_PATH,f"VIA_json_{d}.pkl")) 
 DatasetCatalog.register(d, lambda d=d: inference_dict)
 MetadataCatalog.get(d).set(thing_classes=["radio_source"])
@@ -122,7 +132,7 @@ lofar_metadata = MetadataCatalog.get(d)
 print("Sample and plot input data as sanity check")
 #"""
 for i, dic in enumerate(random.sample(inference_dict, 3)):
-    print(dic["file_name"])
+    print("File sampled for sanity check:", dic["file_name"].replace('/data/mostertrij',start_dir))
     img = imread(dic["file_name"])
     visualizer = Visualizer(img[:, :, ::-1], metadata=lofar_metadata, scale=1)
     vis = visualizer.draw_dataset_dict(dic)
@@ -167,15 +177,15 @@ print('Done with inference.')
 
 def get_idx_dict(cat):
     """Create dict that returns row index of objects when given sourcename"""
-    idx_dict = {s:idx for s, idx in zip(cat.Source_Name.values,cat.index.values)}
+    idx_dict = {str(s):idx for s, idx in zip(cat.Source_Name.values,cat.index.values)}
     return idx_dict
 
 def get_comps(predicted_comp_cat):
     """Turn list of source_names, component_names into a list"""
     combined_names = list(OrderedDict.fromkeys(predicted_comp_cat['Source_Name'].values))
-    comp_dict = {s:[] for s in combined_names}
+    comp_dict = {str(s):[] for s in combined_names}
     for s, comp in zip(predicted_comp_cat.Source_Name.values,predicted_comp_cat.Component_Name.values):
-            comp_dict[s].append(comp)
+            comp_dict[str(s)].append(str(comp))
     return [comp_dict[n] for n in combined_names]
 
 def ellipse(x0,y0,a,b,pa,n=200):
@@ -284,7 +294,12 @@ comp_names = get_comps(predicted_comp_cat)
 
 # Get component lists for each predicted source
 idx_dict = get_idx_dict(source_cat)
+print("idx_dict:", idx_dict)
+print("source cat:", source_cat)
+print("predicted cat:", predicted_comp_cat)
+print("compnames:", comp_names)
 clists = [source_cat.iloc[[idx_dict[c] for c in comps]] for comps in comp_names]
+print("clists:", clists)
 
 
 # Iterate over clists

@@ -318,6 +318,7 @@ class LOFAREvaluator(DatasetEvaluator):
         # Save to hdf
         hdf_path = os.path.join(self._output_dir,self.save_name + ".h5")
         comp_df.to_hdf(hdf_path,'df')
+        print('Writing component dataframe to hdf5:',hdf_path)
         # Save to fits
         fits_path = os.path.join(self._output_dir,self.save_name + ".fits")
         if os.path.exists(fits_path):
