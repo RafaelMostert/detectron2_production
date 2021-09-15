@@ -284,7 +284,7 @@ class LOFAREvaluator(DatasetEvaluator):
         # Check which components fall within the predicted bbox with the highest score
         if self.remove_unresolved:
             self.reinsert_unresolved_for_triplets()
-            self.comp_inside_box = [[foc_name]+[name for x,y,unresolved,name in zip(
+            self.comp_inside_box = [[str(foc_name)]+[str(name) for x,y,unresolved,name in zip(
                     xs,ys,unresolved_list,names) 
                     if self.is_within(x*scale_factor,y*scale_factor,bbox[0],bbox[1],bbox[2],bbox[3]) \
                                         and not unresolved]
@@ -292,7 +292,7 @@ class LOFAREvaluator(DatasetEvaluator):
                                     self.unrelated_unresolved,
                                         self.unrelated_names,self.pred_central_bboxes_scores,self.focussed_names)]
         else:
-            self.comp_inside_box = [[foc_name]+[name for x,y,name in zip(xs,ys,names) 
+            self.comp_inside_box = [[str(foc_name)]+[str(name) for x,y,name in zip(xs,ys,names) 
                                         if self.is_within(x*scale_factor,y*scale_factor,bbox[0],bbox[1],bbox[2],bbox[3])]
                                 for (xs,ys),names, (bbox, score), foc_name in zip(self.unrelated_comps,
                                         self.unrelated_names,self.pred_central_bboxes_scores,self.focussed_names)]
@@ -303,10 +303,14 @@ class LOFAREvaluator(DatasetEvaluator):
         indices = [max([(i,size) for i, (names,size) in enumerate(zip(self.comp_inside_box, sizes)) if
             foc_name in names], key = lambda t: t[1])[0]
             for foc_name in self.focussed_names]
+        print("indices after sort on largest box:", indices)
         # remove duplicates
         #indices = list(set(indices))
         indices = list(OrderedDict.fromkeys(indices))
+        print("indices after orderdictot:", indices)
+        print("comp_inside_box", self.comp_inside_box)
         self.comp_inside_box = np.array(self.comp_inside_box)[indices]
+        print("comp_inside_box after index filtering", self.comp_inside_box)
         # Create pandas dataframe 
         combined_names = []
         comp_names = []
