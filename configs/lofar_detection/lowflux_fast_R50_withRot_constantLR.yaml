@@ -1,0 +1,16 @@
+_BASE_: "base_lofar_fast_rcnn_R50-FPN.yaml"
+OUTPUT_DIR: "/data/mostertrij/tridentnet/output/lowflux_fast_R50_withRot_constantLR/"
+DATASETS:
+  TRAIN: ("inference",)
+  TEST: ("inference","val","test")
+INPUT:
+  ROTATION_ENABLED: True
+SOLVER:
+  #LR_SCHEDULER_NAME:  "WarmupCosineLR" 
+  STEPS: ()
+  MAX_ITER: 50000 
+  CHECKPOINT_PERIOD: 5000
+TEST:
+  REMOVE_UNRESOLVED: False
+  REMOVE_THRESHOLD: ("0.20") # Needs to be a string
+  EVAL_PERIOD: 10000
