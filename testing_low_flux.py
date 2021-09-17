@@ -42,6 +42,8 @@ matplotlib.rcParams.update({'font.size': 18})
 parser = argparse.ArgumentParser(description='Description of your program')
 parser.add_argument('-d','--debug', help='Enabling debug will render debug output and plots.',
         dest='debug', action='store_true', default=False)
+parser.add_argument('-s','--seed', help='Random seed used for noise augmentation.',
+        dest='seed', default=321)
 parser.add_argument('-o','--overwrite', help='Enabling overwrite will overwrite pybdsf catalog for augmented cutouts.',
         default=False, action='store_true')
 parser.add_argument('-n','--noises',nargs='+',type=int, help='List of noise sigmas used to augment cutout to resemble fainter sources.',
@@ -57,6 +59,7 @@ parser.add_argument('-n','--noises',nargs='+',type=int, help='List of noise sigm
 args = vars(parser.parse_args())
 
 debug = args['debug']
+seed = int(args['seed'])
 overwrite = args['overwrite']
 #source_cat_path = args['source_cat_path']
 #comp_cat_path = args['comp_cat_path']
@@ -65,6 +68,7 @@ noises = args['noises']
 assuming_output_in_deg =True
 print("Assuming sizes in generated PyBDSF cat is in degree and converting it to arcsec:",
         assuming_output_in_deg)
+np.random.seed(seed)
 
 if debug:
     print("Parsed arguments: Debug:", debug, "overwrite",overwrite, 'noises', noises)
@@ -373,9 +377,11 @@ img.write_catalog(outfile='{augmented_gaus_fits_path}',
         augmented_cat = pinklib.postprocessing.fits_catalogue_to_pandas(augmented_cat_fits_path)
         augmented_cat['Mosaic_ID'] = field
         augmented_cat['Source_Name'] = augmented_cat.Source_id
+        augmented_cat['Source_Name'] = augmented_cat['Source_Name'].astype(str)
         augmented_gaus = pinklib.postprocessing.fits_catalogue_to_pandas(augmented_gaus_fits_path)
         augmented_gaus['Mosaic_ID'] = field
         augmented_gaus['Source_Name'] = augmented_gaus.Source_id
+        augmented_gaus['Source_Name'] = augmented_gaus['Source_Name'].astype(str)
         if assuming_output_in_deg:
             augmented_cat['Maj']*=3600
             augmented_cat['Min']*=3600
@@ -529,15 +535,14 @@ img.write_catalog(outfile='{augmented_gaus_fits_path}',
                 for icomp, comp in clist.iterrows():
                     rc = deepcopy(comp)
         #             rc['Component_Name'] = rc['Source_Name']
-                    rc['Source_Name'] = sname
+                    rc['Source_Name'] = str(sname)
                     compdata.append(rc)
                 r['Source_id']= clist['Source_id'].values
                 r['RA']=ra
                 r['DEC']=dec
-                r['Source_Name']=sname
+                r['Source_Name']=str(sname)
                 r['E_RA']=np.sqrt(np.mean(np.power(clist['E_RA'],2)))
                 r['E_DEC']=np.sqrt(np.mean(np.power(clist['E_DEC'],2)))
-                r['Source_Name']=sname
                 r['Total_flux']=tfluxsum
                 r['E_Total_flux']=np.sqrt(np.sum(np.power(clist['E_Total_flux'],2)))
                 maxpk=clist['Peak_flux'].idxmax()

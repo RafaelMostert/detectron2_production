@@ -288,19 +288,17 @@ comp_keys = ['Source_Name', 'RA', 'E_RA', 'DEC', 'E_DEC', 'Peak_flux',
 # Read cats
 source_cat = pd.read_hdf(source_cat_path)
 predicted_comp_cat = pd.read_hdf(os.path.join(cfg.OUTPUT_DIR, bare_predicted_cat_name+'.h5'))
+#print('source_cat', source_cat)
+#print('source_comp', predicted_comp_cat)
 
 # Get unique combined names
 comp_names = get_comps(predicted_comp_cat)
 
 # Get component lists for each predicted source
 idx_dict = get_idx_dict(source_cat)
-print("idx_dict:", idx_dict)
-print("source cat:", source_cat)
-print("predicted cat:", predicted_comp_cat)
-print("compnames:", comp_names)
+#print('idx_dict', idx_dict)
+#print('comp_names', comp_names)
 clists = [source_cat.iloc[[idx_dict[c] for c in comps]] for comps in comp_names]
-print("clists:", clists)
-
 
 # Iterate over clists
 # Modelled after https://github.com/mhardcastle/lotss-catalogue/blob/master/catalogue_create/process_lgz.py
@@ -343,7 +341,10 @@ for irow, clist in enumerate(clists):
         tfluxsum=clist['Total_flux'].sum()
         ra=np.sum(clist['RA']*clist['Total_flux'])/tfluxsum
         dec=np.sum(clist['DEC']*clist['Total_flux'])/tfluxsum
-        sname=sourcename(ra,dec)
+        #sname=sourcename(ra,dec)
+        print('clist', clist)
+        sname= clist.Source_Name.values
+        print("sname:", sname)
         for icomp, comp in clist.iterrows():
             rc = deepcopy(comp)
             rc['Component_Name'] = rc['Source_Name']
@@ -351,7 +352,6 @@ for irow, clist in enumerate(clists):
             compdata.append(rc)
         r['RA']=ra
         r['DEC']=dec
-        r['Source_Name']=sname
         r['E_RA']=np.sqrt(np.mean(np.power(clist['E_RA'],2)))
         r['E_DEC']=np.sqrt(np.mean(np.power(clist['E_DEC'],2)))
         r['Source_Name']=sname
@@ -384,8 +384,10 @@ for irow, clist in enumerate(clists):
 source_component_cat = pd.DataFrame(columns=comp_keys, data=compdata).reset_index(drop=True)
 predicted_source_cat = pd.DataFrame(columns=keys+['Predicted_Size','Predicted_Width','Predicted_PA',
                                                   'Predicted_Assoc'], data=data)
+predicted_source_cat['Source_Name'] = predicted_source_cat['Source_Name'].astype(str)
 save_cat(predicted_source_cat, cfg.OUTPUT_DIR, 'LoTSS_predicted_v0_merge',
          keys=keys+['Predicted_Size','Predicted_Width','Predicted_PA','Predicted_Assoc'] )
+source_component_cat['Source_Name'] = source_component_cat['Source_Name'].astype(str)
 save_cat(source_component_cat, cfg.OUTPUT_DIR, 'LoTSS_predicted_v0.comp', keys=comp_keys)
 
 print("Inference catalogues created and saved at:", cfg.OUTPUT_DIR)
