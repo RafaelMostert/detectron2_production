@@ -32,6 +32,8 @@ linked_cat = pd.read_hdf(linked_cat_path)
 sorted_linked_cat = linked_cat.sort_values(by='Total_flux', ascending=False)
 predicted_cat = pd.read_hdf(predicted_cat_path)
 sorted_predicted_cat = predicted_cat.sort_values(by='Total_flux', ascending=False)
+debug_print("Agumented cat:")
+debug_print(augmented_cat)
 debug_print("linked_cat:")
 debug_print(sorted_linked_cat)
 debug_print("predicted cat:")
@@ -80,7 +82,7 @@ flux_fractions_missing = []
 tallied_comps = []
 number_of_linked_components = [len(row) if isinstance(row, np.ndarray) else 1 for row in sorted_linked_cat.Source_id.values]
 for row in sorted_linked_cat.Source_id.values:
-    #print("\nrow:", row, type(row))
+    print("\nrow:", row, type(row))
     if isinstance(row, np.ndarray):
         row_total_flux = name_to_linkedflux[str(row)]
         row_fractions = []
@@ -94,6 +96,7 @@ for row in sorted_linked_cat.Source_id.values:
             else:
                 # Check if source is present in predicted cat at all
                 if not str(v) in predict_names:
+                    print(v, "not present in RCNN predicted catalogue")
                     tallied_comps.append(str(v))
                     missing_flux += name_to_flux[str(v)]
                     continue

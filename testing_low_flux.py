@@ -70,6 +70,27 @@ print("Assuming sizes in generated PyBDSF cat is in degree and converting it to 
         assuming_output_in_deg)
 np.random.seed(seed)
 
+
+def get_skycoord_bounds(ra,dec, size_degree, cutout_fits_path):
+    # Calculating bounds based on image
+    hdu = fits.open(cutout_fits_path)
+    psize = int(size_degree/hdu[0].header['CDELT2'])
+    wcs = WCS(hdu[0].header)
+    ndims = hdu[0].header['NAXIS'] 
+    pvect = np.zeros((1,ndims))
+    print(ra,dec)
+    pvect[0][0] = ra
+    pvect[0][1] = dec
+    # maybe the origin should be 1 here...
+    imc = wcs.wcs_world2pix(pvect,1)
+    imc0 = imc-psize/2
+    skyc0 = wcs.wcs_pix2world(imc0,0)
+    imc1 = imc+psize/2
+    skyc1 = wcs.wcs_pix2world(imc1,0)
+    min_RA,min_DEC = skyc1[0][0],skyc0[0][1]
+    max_RA,max_DEC = skyc0[0][0],skyc1[0][1]
+    return min_RA, max_RA, min_DEC, max_DEC
+
 if debug:
     print("Parsed arguments: Debug:", debug, "overwrite",overwrite, 'noises', noises)
 
@@ -213,13 +234,14 @@ gaussian_blur = pinklib.postprocessing.FWHM_to_sigma_for_gaussian(beam_size_in_a
 # Make large image cutout
 ## Choose patch of sky to focus on
 loc = SkyCoord('11:35:12.17 +48:26:41.3', frame='icrs', unit=(u.hourangle, u.deg))
-width_in_arcsec = 8*60
+width_in_arcsec = 16*60
 ## Create cutout
 subimage = pinklib.postprocessing.make_numpy_cutout_from_fits(
     width_in_arcsec, width_in_arcsec, loc.ra, loc.dec,
  LoTSS_field_path, dimensions_normal=True, just_data=False,
     arcsec_per_pixel=angular_resolution)
 bb = subimage.bbox_original
+
 if debug:
     print(f'Restfrequency in Hz:', int(restfreq))
     print(f'Angular resolution: {angular_resolution:.2f} arcsec/pixels')
@@ -237,6 +259,8 @@ mindec = np.min([loc.dec.value - width_in_arcsec/(3600*2),
                        loc.dec.value + width_in_arcsec/(3600*2)])
 maxdec = np.max([loc.dec.value - width_in_arcsec/(3600*2),
                        loc.dec.value + width_in_arcsec/(3600*2)])
+minra, maxra, mindec, maxdec =  get_skycoord_bounds(loc.ra.value,loc.dec.value,
+        width_in_arcsec/3600, LoTSS_field_path)
 
 # Query sources within cutout from vac cat
 field_cat = vac[vac.Mosaic_ID == field]

@@ -2,7 +2,7 @@
 # 1. Augment cutout
 # 2. Run PyBDSF to create augmented_cat
 # 3. Link sources to create retrieved_sources_cat and retrieved_components_cat
-python testing_low_flux.py -o -s 321
+#python testing_low_flux.py -o -s 321
 
 # 4. Prepro cutouts based on augmented_cat
 #-----------------------------------------------------------------------------------
