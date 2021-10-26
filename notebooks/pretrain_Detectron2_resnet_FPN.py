@@ -31,6 +31,7 @@ from detectron2.config import get_cfg
 from detectron2.modeling import build_model
 
 # Import the Python frameworks we need
+import argparse
 import numpy as np
 import os
 import glob
@@ -48,7 +49,30 @@ from copy import deepcopy
 #import torchvision.transforms.functional as functional
 
 
+parser = argparse.ArgumentParser(description="""Pretrain resnet50""")
+parser.add_argument('-n','--notrain', help='This flag prevents training and loads a previous trained model',
+        dest='train', action='store_false', default=True)
+parser.add_argument('-g','--gpus', help='Specify max number of gpus', default='1')
+parser.add_argument('-e','--epochs', help='Specify max number of epochs', default='10')
+parser.add_argument('-b','--batchsize', help='Specify batchsize', default='16')
+parser.add_argument('-w','--workers', help='Specify max number of workers', default='10')
+parser.add_argument('-p','--basepath', help='Specify base path', default='/data/mostertrij')
+args = vars(parser.parse_args())
+train = bool(args['train'])
+base_path = args['basepath']
 # # Load our Detectron2 backbone (bottom-up)
+
+# Configuration
+# The default configuration with a batch size of 256 and input resolution of 128
+# requires 6GB of GPU memory.
+num_workers = int(args['workers'])
+batch_size = int(args['batchsize'])
+seed = 42
+max_epochs = int(args['epochs'])
+input_size = 256
+gpus = int(args["gpus"]) if torch.cuda.is_available() else 0
+print(f"Training is set to:", train)
+print(f"Using {num_workers} CPU-workers, {gpus} GPUs, {batch_size} batch size, for {max_epochs} epochs.")
 
 
 cfg = get_cfg()
@@ -107,15 +131,6 @@ out = simCLR(toy_input_view_a, toy_input_view_b)
 # In[5]:
 
 
-# Configuration
-# The default configuration with a batch size of 256 and input resolution of 128
-# requires 6GB of GPU memory.
-num_workers = 10
-batch_size = 256
-seed = 42
-max_epochs = 5
-input_size = 256
-
 # %%
 # Let's set the seed for our experiments
 pl.seed_everything(seed)
@@ -123,7 +138,7 @@ pl.seed_everything(seed)
 # Make sure `path_to_data` points to the downloaded clothing dataset.
 # You can download it using 
 # `git clone https://github.com/alexeygrigorev/clothing-dataset.git`
-path_to_data = '/data/mostertrij/data/frcnn_images/uLB300_removed_noRot/LGZ_COCOstyle/all'
+path_to_data = os.path.join(base_path, 'data/frcnn_images/uLB300_removed_noRot/LGZ_COCOstyle/all')
 
 
 # Setup data augmentations and loaders
@@ -203,13 +218,14 @@ encoder = lightly.embedding.SelfSupervisedEmbedding(
 
 # %% 
 # use a GPU if available
-gpus = 1 if torch.cuda.is_available() else 0
+print(f"Trying to use {gpus} gpus.")
 # %%
 # Train the Embedding
 # --------------------
 # The encoder itself wraps a PyTorch-Lightning module. We can pass any 
 # lightning trainer parameter (e.g. gpus=, max_epochs=) to the train_embedding method.
-pretrained_model_save_path = f'/data/mostertrij/data/pretrained_models/pretrained_model_epochs{max_epochs}_batch{batch_size}.pth' 
+pretrained_model_save_path = os.path.join(base_path,
+        f'data/pretrained_models/pretrained_model_epochs{max_epochs}_batch{batch_size}.pth')
 if train:
     start = time.time()
     encoder.train_embedding(gpus=gpus, 
