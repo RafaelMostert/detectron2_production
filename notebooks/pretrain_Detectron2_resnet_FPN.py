@@ -77,7 +77,7 @@ print(f"Using {num_workers} CPU-workers, {gpus} GPUs, {batch_size} batch size, f
 
 cfg = get_cfg()
 conf = '/content/COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml'
-conf = '../configs/lofar_detection/uLB300_faster_R50_removed_constantLR.yaml'
+conf = '/home/mostertrij/detectron2/configs/lofar_detection/uLB300_faster_R50_removed_constantLR.yaml'
 cfg.merge_from_file(conf)
 detmodel = build_model(cfg) #'detectron2://ImageNetPretrained/MSRA/R-50.pkl'
 
@@ -225,18 +225,26 @@ print(f"Trying to use {gpus} gpus.")
 # The encoder itself wraps a PyTorch-Lightning module. We can pass any 
 # lightning trainer parameter (e.g. gpus=, max_epochs=) to the train_embedding method.
 pretrained_model_save_path = os.path.join(base_path,
-        f'data/pretrained_models/pretrained_model_epochs{max_epochs}_batch{batch_size}.pth')
+        f'data/pretrained_models/pretrained_model_epochs{max_epochs}_batch{batch_size}_gpus{gpus}.pth')
 if train:
     start = time.time()
+
     encoder.train_embedding(gpus=gpus, 
-                            progress_bar_refresh_rate=100,
-                            max_epochs=max_epochs)
-    print(f"Training for {max_epochs} epochs took {time.time()-start:.1f} sec.")
-    print(f"Or {(time.time()-start)/max_epochs:.1f} sec per epoch.")
+                        progress_bar_refresh_rate=10,
+                        num_nodes=1,
+                        #accelerator='ddp',
+                        distributed_backend='ddp',
+                        checkpoint_callback=True,
+                        max_epochs=max_epochs)
+
+
 
     # Storing the simCLR pretrained backbone without the added averagepool-layer
     state_dict = {'resnet50_parameters': simCLR.backbone[:-1].state_dict()}
     torch.save(state_dict, pretrained_model_save_path)
+    print(f"Training for {max_epochs} epochs took {time.time()-start:.1f} sec.")
+    print(f"Or {(time.time()-start)/max_epochs:.1f} sec per epoch.")
+
 else:
     # Initialize a detectron2 model
     new_detmodel = build_model(cfg)
@@ -292,3 +300,4 @@ for i, (old_key, dest_key) in enumerate(zip(pretrained_keys, destination_keys)):
 # Load partial model weights
 new_detmodel.backbone.bottom_up.load_state_dict(state,strict=False)
 """
+print("Done", checkpoint_path)
