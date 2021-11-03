@@ -33,7 +33,7 @@ _C.MODEL.META_ARCHITECTURE = "GeneralizedRCNN"
 _C.MODEL.WEIGHTS = ""
 
 # Path to a checkpoint file to be loaded into the model. Only works for LOFARTrainer.
-_C.MODEL.PRETRAIN_WEIGHTS = ""
+_C.MODEL.PRETRAINED_WEIGHTS = ""
 
 # Values to be used for image normalization (BGR order, since INPUT.FORMAT defaults to BGR).
 # To train on images of different number of channels, just set different mean & std.
