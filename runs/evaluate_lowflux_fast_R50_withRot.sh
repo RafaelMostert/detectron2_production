@@ -33,7 +33,7 @@ path_to_weights="/data/mostertrij/tridentnet/output/uLB300_fast_R50_withRot_cons
 for val in ${StringArray[@]}; do
     CUDA_VISIBLE_DEVICES=$cuda_device python ../evaluate_lofar.py \
         ../configs/lofar_detection/$val".yaml" \
-        /home/rafael/data/mostertrij $path_to_weights $seed &> \
-        logs/eva$evaluated_at"_"$val"_seed"$seed".txt" &
-    sleep 90
+        /data1/mostertrij $path_to_weights $seed #&> \
+        #logs/eva$evaluated_at"_"$val"_seed"$seed".txt" &
+    #sleep 90
 done

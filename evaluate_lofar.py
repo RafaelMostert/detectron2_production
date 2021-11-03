@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""
+Use this script to get prediction plots and prediction_statistics.npz 
+for a given trained model.
+The first is used for debugging and for the paper.
+The second is used to be able to plot the model's
+prediction score versus catalogue accuracy.
+"""
 
 print("Setup detectron2 logger")
 from detectron2.utils.logger import setup_logger
@@ -35,7 +42,6 @@ assert len(argv) >= 4, ("Insert 1) path of configuration file, 2) beginning of f
     "path to model weights 4) optional the seed, when executing this script")
 cfg = get_cfg()
 cfg.merge_from_file(argv[1])
-lotss_dr2_path = '/data/mostertrij/data/catalogues/LoTSS_DR2_v100.srl.h5'
 
 # Adjust beginning of file paths
 start_dir = argv[2]
@@ -52,13 +58,11 @@ if len(argv) == 5:
     print("Training seed is:", cfg.SEED)
 
 cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
-lotss_dr2_path = lotss_dr2_path.replace("/data/mostertrij",start_dir)
 
 # Read in path to weights that will be evaluated on its own train/test/val
 # For example: pretrained_model_path = "/data/mostertrij/tridentnet/output/v3_precomputed_constantLR_withRot_no_box_reg/model_0005999.pth"
 pretrained_model_path = argv[3].replace('/data/mostertrij',start_dir)
 
-assert os.path.exists(lotss_dr2_path), lotss_dr2_path
 print(f"Loaded configuration file {argv[1]}")
 DATASET_PATH= cfg.DATASET_PATH
 print(f"Experiment: {cfg.EXPERIMENT_NAME}")
@@ -135,3 +139,4 @@ for d in list(cfg.DATASETS.TEST):
     print('Start inference on dataset to get evaluation.')
     predictions = inference_on_dataset(trainer.model, inference_loader, evaluator, overwrite=True)
 print("All done.")
+

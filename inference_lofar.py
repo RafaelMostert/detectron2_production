@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Use this script to create a predicted component and (merged) source catalogue for a given dataset.
+"""
 
 print("Setup detectron2 logger")
 from detectron2.utils.logger import setup_logger
