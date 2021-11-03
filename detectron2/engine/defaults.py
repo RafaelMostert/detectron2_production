@@ -14,6 +14,7 @@ import logging
 import os
 import sys
 from collections import OrderedDict
+from copy import deepcopy
 import torch
 from fvcore.common.file_io import PathManager
 from fvcore.nn.precise_bn import get_bn_modules
@@ -781,6 +782,26 @@ class LOFARTrainer(SimpleTrainer):
         Overwrite it if you'd like a different model.
         """
         model = build_model(cfg)
+        if not cfg.MODEL.PRETRAIN_WEIGHTS == "":
+            assert os.path.exists(cfg.MODEL.PRETRAIN_WEIGHTS), f'Pretrain path does not exist: {cfg.MODEL.PRETRAIN_WEIGHTS}'
+
+            # Load the pretrained model
+            ckpt = torch.load(cfg.MODEL.PRETRAIN_WEIGHTS)
+            state = ckpt['resnet50_parameters']
+
+            # Change keynames of simCLR pretrained model state_dict to match detectron2 state_dict
+            # Sidenote: Iterating over state is equivalent to iterating over state.keys()
+            pretrained_keys = deepcopy(list(state.keys()))
+            destination_keys = deepcopy(list(new_detmodel.backbone.bottom_up.state_dict()))
+            for i, (old_key, dest_key) in enumerate(zip(pretrained_keys, destination_keys)): 
+                #if i<3: print(old_key,' ,  ',dest_key) # Show the slight difference in keynames
+                assert old_key.split('.')[1:] == dest_key.split('.')[1:]
+                state[dest_key] = state[old_key]
+            [state.pop(k) for k in pretrained_keys]; # Delete old keys
+
+            # Load partial model weights
+            model.backbone.bottom_up.load_state_dict(state,strict=False)
+
         logger = logging.getLogger(__name__)
         logger.info("Model:\n{}".format(model))
         return model
