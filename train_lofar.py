@@ -36,6 +36,7 @@ if len(argv) >= 3:
     print("Beginning of paths:", start_dir)
     cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
     cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
+    cfg.MODEL.PRETRAINED_WEIGHTS = cfg.MODEL.PRETRAINED_WEIGHTS.replace("/data/mostertrij",start_dir)
     cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
     if len(argv) >= 4:
         cfg.SEED = int(argv[3])
@@ -48,6 +49,9 @@ print(f"Loaded configuration file {argv[1]}")
 #ROTATION_ENABLED = bool(int(argv[2])) # 0 is False, 1 is True
 DATASET_PATH= cfg.DATASET_PATH
 print(f"Experiment: {cfg.EXPERIMENT_NAME}")
+if not cfg.MODEL.PRETRAINED_WEIGHTS == "":
+    print(f"Pretrained weights loaded from: {cfg.MODEL.PRETRAINED_WEIGHTS}")
+
 print(f"Rotation enabled: {cfg.INPUT.ROTATION_ENABLED}")
 print(f"Precomputed bboxes: {cfg.MODEL.PROPOSAL_GENERATOR}")
 print(f"Attempt to load training data from: {DATASET_PATH}")
