@@ -792,7 +792,7 @@ class LOFARTrainer(SimpleTrainer):
             # Change keynames of simCLR pretrained model state_dict to match detectron2 state_dict
             # Sidenote: Iterating over state is equivalent to iterating over state.keys()
             pretrained_keys = deepcopy(list(state.keys()))
-            destination_keys = deepcopy(list(new_detmodel.backbone.bottom_up.state_dict()))
+            destination_keys = deepcopy(list(model.backbone.bottom_up.state_dict()))
             for i, (old_key, dest_key) in enumerate(zip(pretrained_keys, destination_keys)): 
                 #if i<3: print(old_key,' ,  ',dest_key) # Show the slight difference in keynames
                 assert old_key.split('.')[1:] == dest_key.split('.')[1:]

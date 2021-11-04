@@ -17,6 +17,7 @@ from detectron2.evaluation import COCOEvaluator, inference_on_dataset
 
 # import some common libraries
 import numpy as np
+import time
 from sys import argv
 from cv2 import imread
 import random
@@ -166,7 +167,9 @@ else:
     trainer.resume_or_load(resume=False)
 
 print("Start training")
+start = time.time()
 trainer.train()
+print(f"Training took {(time.time()-start)/3600:.2f} sec")
 print('Done training.')
 
 """
