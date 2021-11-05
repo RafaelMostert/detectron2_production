@@ -169,7 +169,7 @@ else:
 print("Start training")
 start = time.time()
 trainer.train()
-print(f"Training took {(time.time()-start)/3600:.2f} sec")
+print(f"Training took {(time.time()-start)/3600:.2f} hour")
 print('Done training.')
 
 """
