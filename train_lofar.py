@@ -56,14 +56,22 @@ if not cfg.MODEL.PRETRAINED_WEIGHTS == "":
 print(f"Rotation enabled: {cfg.INPUT.ROTATION_ENABLED}")
 print(f"Precomputed bboxes: {cfg.MODEL.PROPOSAL_GENERATOR}")
 print(f"Attempt to load training data from: {DATASET_PATH}")
-if len(argv) == 5:
+if len(argv) >= 5:
     train_dataset_size = int(argv[4])
-    cfg.DATASETS.TRAIN_SIZE = train_dataset_size
-    print(f"Training data set contains {cfg.DATASETS.TRAIN_SIZE} images.")
+    if train_dataset_size != 0:
+        cfg.DATASETS.TRAIN_SIZE = train_dataset_size
+        print(f"Training data set contains {cfg.DATASETS.TRAIN_SIZE} images.")
+        if cfg.OUTPUT_DIR.endswith('/'):
+            cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_{train_dataset_size}' 
+        else:
+            cfg.OUTPUT_DIR = cfg.OUTPUT_DIR + f'_{train_dataset_size}'
+if len(argv) >= 6:
+    maxiter = int(argv[5])
+    cfg.SOLVER.MAX_ITER = maxiter
     if cfg.OUTPUT_DIR.endswith('/'):
-        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_{train_dataset_size}' 
+        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR[:-1] + f'_maxiter{maxiter}' 
     else:
-        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR + f'_{train_dataset_size}'
+        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR + f'_maxiter{maxiter}'
 print(f"Output path: {cfg.OUTPUT_DIR}")
 os.makedirs(cfg.OUTPUT_DIR,exist_ok=True)
 

@@ -607,9 +607,10 @@ class LOFAREvaluator(DatasetEvaluator):
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
         print("Plot predictions")
-        #if debug or self.save_predictions:
-        #    self.plot_predictions(f"all_prediction_debug_images_rgb",cutout_list=list(range(len(self.related_comps))),
-        #            debug=False, show_second_best=False, grayscale=False)
+        if debug or self.save_predictions:
+            self.plot_predictions(f"all_prediction_debug_images_rgb",
+                    cutout_list=list(range(len(self.related_comps))),
+                    debug=False, show_second_best=False, grayscale=False)
         # Save predictions, scores and misboxed categories
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
         source_names = [p.split('/')[-1] for p in image_source_paths]
@@ -848,8 +849,8 @@ class LOFAREvaluator(DatasetEvaluator):
             zip(ran, self.n_comps, self.close_comp_scores) if n_comp == 1 and unrelated > 0]
         self.misboxed_category[fail_indices] = 2
             
-        #if debug or self.save_predictions:
-        if 1==2:
+        if debug or self.save_predictions:
+        #if 1==2:
             self.plot_predictions("single_overestimation", imsize=200,cutout_list=fail_indices,
                     show_second_best=True, debug=False, lgm_to_kafka=False)
 
@@ -859,8 +860,8 @@ class LOFAREvaluator(DatasetEvaluator):
                                  if n_comp > 1 and unrelated > 0]
         self.misboxed_category[fail_indices] = 4
 
-        #if debug or self.save_predictions:
-        if 1==2:
+        if debug or self.save_predictions:
+        #if 1==2:
             self.plot_predictions("multi_overestimation",
                     cutout_list=fail_indices, show_second_best=True,  debug=False, lgm_to_kafka=False)
         return single_comp_fail_frac, multi_comp_binary_fail_frac
@@ -889,8 +890,8 @@ class LOFAREvaluator(DatasetEvaluator):
         fail_indices = [i for i, n_comp,central_covered in zip(ran, self.n_comps, self.central_covered) 
                 if n_comp == 1 and not central_covered ]
 
-        #if debug or self.save_predictions:
-        if 1==2:
+        if debug or self.save_predictions:
+        #if 1==2:
             self.plot_predictions("single_missing", cutout_list=fail_indices, show_second_best=True, debug=False, lgm_to_kafka=False)
 
         self.misboxed_category[fail_indices] = 1
@@ -902,8 +903,8 @@ class LOFAREvaluator(DatasetEvaluator):
                     or (not central_covered))]
         self.misboxed_category[fail_indices] = 3
 
-        #if debug or self.save_predictions:
-        if 1==2:
+        if debug or self.save_predictions:
+        #if 1==2:
             self.plot_predictions("multi_underestimation", cutout_list=fail_indices,
                     show_second_best=True, debug=False, lgm_to_kafka=False)
 
