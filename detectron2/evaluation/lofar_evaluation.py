@@ -607,10 +607,10 @@ class LOFAREvaluator(DatasetEvaluator):
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
         print("Plot predictions")
-        if debug or self.save_predictions:
-            self.plot_predictions(f"all_prediction_debug_images_rgb",
-                    cutout_list=list(range(len(self.related_comps))),
-                    debug=False, show_second_best=False, grayscale=False)
+        #if debug or self.save_predictions:
+        #    self.plot_predictions(f"all_prediction_debug_images_rgb",
+        #            cutout_list=list(range(len(self.related_comps))),
+        #            debug=False, show_second_best=False, grayscale=False)
         # Save predictions, scores and misboxed categories
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
         source_names = [p.split('/')[-1] for p in image_source_paths]

@@ -4,7 +4,8 @@ DATASETS:
   TRAIN: ("train",)
   TEST: ("train","val","test")
 MODEL:
-  PRETRAINED_WEIGHTS: "/data/mostertrij/data/pretrained_models/pretrained_model_epochs500_batch256_gpus4_cjprob0.1_cjstr0.01_minscale0.6_gaus0.5_kernel2_normFalse.pth"
+  #PRETRAINED_WEIGHTS: "/data/mostertrij/data/pretrained_models/pretrained_model_epochs500_batch256_gpus4_cjprob0.1_cjstr0.01_minscale0.6_gaus0.5_kernel2_normFalse.pth"
+  PRETRAINED_WEIGHTS: "/data/mostertrij/data/pretrained_models/pretrained_model_epochs2500_batch64_gpus1_cjprob0.1_cjstr0.01_minscale0.6_gaus0.5_kernel2_normFalse.pth"
 INPUT:
   ROTATION_ENABLED: True
 SOLVER:
