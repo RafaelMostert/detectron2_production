@@ -21,6 +21,8 @@ from astropy.table import Table
 from astropy.coordinates import SkyCoord
 from matplotlib.path import Path
 from scipy.spatial import ConvexHull
+from matplotlib import rcParams
+rcParams.update({'font.size': 16})
 
 from detectron2.data import MetadataCatalog
 from detectron2.utils import comm
@@ -607,10 +609,10 @@ class LOFAREvaluator(DatasetEvaluator):
             self._check_if_pred_central_bbox_includes_unassociated_comps(debug=debug)
 
         print("Plot predictions")
-        #if debug or self.save_predictions:
-        #    self.plot_predictions(f"all_prediction_debug_images_rgb",
-        #            cutout_list=list(range(len(self.related_comps))),
-        #            debug=False, show_second_best=False, grayscale=False)
+        if debug or self.save_predictions:
+            self.plot_predictions(f"all_prediction_debug_images_rgb",
+                    cutout_list=list(range(len(self.related_comps))),
+                    debug=False, show_second_best=False, grayscale=False)
         # Save predictions, scores and misboxed categories
         image_source_paths = [p["file_name"] for p in self._predictions[0]]
         source_names = [p.split('/')[-1] for p in image_source_paths]
@@ -718,7 +720,7 @@ class LOFAREvaluator(DatasetEvaluator):
                     box_style='dashed'
                     im[:,:,1] = 255-im[:,:,1]
                     ax1.imshow(im)
-                ax1.text(bbox[0],bbox[1]-3,f"{score:.1%}",size=14,color=box_col)
+                ax1.text(bbox[0],bbox[1]-3,f"{score:.1%}",size=18,color=box_col)
         
                 if show_second_best:
                     ax1.text(bbox[0],bbox[1]-3,f"{score:.1%}")
