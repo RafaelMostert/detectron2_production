@@ -4,8 +4,9 @@
 cuda_device=0
 seed=1
 
-declare -a StringArray=("uLB300_fast_R50_removed_withRot_constantLR"
-"uLB300_fast_R50_withRot_constantLR" "uLB300_fast_R50_removed_constantLR" )
+declare -a StringArray=( #"uLB300_fast_R50_removed_withRot_constantLR"
+ #"uLB300_fast_R50_withRot_constantLR" "uLB300_fast_R50_removed_constantLR"
+"uLB300_fast_R50_constantLR" )
 
 declare -a iterations=( 100 1000 2000 3000 )
 
