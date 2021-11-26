@@ -84,9 +84,8 @@ def get_lofar_dicts(annotation_filepath):
     new_data = []
     train_size_limited = False
     if annotation_filepath.endswith('train.pkl'): 
-        if cfg.DATASETS.TRAIN_SIZE < len(dataset_dicts) and cfg.INPUT.ROTATION_ENABLED:
-            assert cfg.INPUT.ROTATION_ENABLED, ("limiting the size of the training set is only", \
-                "implemented with rotation augmentation enabled.")
+
+        if cfg.DATASETS.TRAIN_SIZE < len(dataset_dicts):
             # for a filename like /data/ILTJ130552.61+495745.5_radio_DR2_rotated0deg.png
             # this leaves us with a list of names like ILTJ130552.61+495745.5 
             component_names = list([dataset_dicts[i]['file_name'].split('/')[-1].split('_')[0]
@@ -104,16 +103,21 @@ def get_lofar_dicts(annotation_filepath):
             ob['bbox_mode'] = BoxMode.XYXY_ABS
         if cfg.MODEL.PROPOSAL_GENERATOR:
             dataset_dicts[i]["proposal_bbox_mode"] = BoxMode.XYXY_ABS
+
         if cfg.INPUT.ROTATION_ENABLED:
             if len(argv) >= 3:
                 dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace('/data2/','/data/').replace("/data/mostertrij",start_dir)
             if not train_size_limited or component_name in component_names:
                 new_data.append(dataset_dicts[i])
+
         else:
             if dataset_dicts[i]['file_name'].endswith('_rotated0deg.png'):
                 if len(argv) >= 3:
                     dataset_dicts[i]['file_name'] = dataset_dicts[i]['file_name'].replace('/data2/','/data/').replace("/data/mostertrij",start_dir)
-                new_data.append(dataset_dicts[i])
+
+                if not train_size_limited or component_name in component_names:
+                    new_data.append(dataset_dicts[i])
+
     print('len dataset is:', len(new_data), annotation_filepath)
     return new_data
 
