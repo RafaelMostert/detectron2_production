@@ -3,6 +3,7 @@ OUTPUT_DIR: "/data/mostertrij/tridentnet/output/uLB300_fast_R50_removed_withRot_
 DATASETS:
   TRAIN: ("train",)
   TEST: ("train","val","test")
+  #TEST: ("test","train","val")
 INPUT:
   ROTATION_ENABLED: True
 SOLVER:

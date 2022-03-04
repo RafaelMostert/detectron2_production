@@ -170,9 +170,11 @@ def inference_on_dataset(model, data_loader, evaluator, overwrite=True, only_zer
 
                 start_compute_time = time.perf_counter()
                 outputs = model(inputs)
-                #if inputs[0]['file_name'].endswith('ILTJ110530.36+465055.8_radio_DR2_rotated0deg.png'):
-                #    print('output filename')
-                #    print(outputs)
+                #missing_box = 'ILTJ123057.73+464446.2_radio_DR2_rotated0deg.png'
+                #if inputs[0]['file_name'].endswith(missing_box):
+                #    print('output filename',missing_box)
+                #    print('inputs:',inputs)
+                #    print('outputs:', outputs)
 
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()

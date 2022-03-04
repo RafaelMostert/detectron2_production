@@ -110,7 +110,7 @@ for d in list(cfg.DATASETS.TEST):
                             get_lofar_dicts(os.path.join(
                                 DATASET_PATH,f"VIA_json_{d}.pkl")))
     MetadataCatalog.get(d).set(thing_classes=["radio_source"])
-lofar_metadata = MetadataCatalog.get("train")
+lofar_metadata = MetadataCatalog.get("test")
 
 # Inference mode
 

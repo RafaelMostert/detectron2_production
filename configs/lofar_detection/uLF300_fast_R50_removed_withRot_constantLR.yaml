@@ -2,8 +2,8 @@ _BASE_: "base_lofar_fast_rcnn_R50-FPN.yaml"
 DATASET_PATH: "/data/mostertrij/data/frcnn_images/uLF300_precomputed_removed/LGZ_COCOstyle/annotations/"
 OUTPUT_DIR: "/data/mostertrij/tridentnet/output/uLF300_fast_R50_removed_withRot_constantLR/"
 DATASETS:
-  TRAIN: ("train",)
-  TEST: ("train","val","test")
+  TRAIN: ("test",)
+  TEST: ("test",)
 INPUT:
   ROTATION_ENABLED: True
 SOLVER:
@@ -15,4 +15,3 @@ TEST:
   REMOVE_UNRESOLVED: True
   REMOVE_THRESHOLD: ("0.20") # Needs to be a string
   EVAL_PERIOD: 10000
-  EXTRA_EVAL: [1000,5000]
