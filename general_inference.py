@@ -45,8 +45,8 @@ parser.add_argument('-o','--overwrite', help='Enabling overwrite will overwrite 
         default=False, action='store_true')
 parser.add_argument('-c','--config-file', required=True, help='Path to fast(er) RCNN yaml configuration file.',
         dest='config_file')
-parser.add_argument('-da','--data-directory', required=True, help='Path to preprocessed images.',
-        dest='data_dir')
+parser.add_argument('-da','--data-path', required=True, help='Path to preprocessed images.',
+        dest='data_path')
 parser.add_argument('-s','--source-cat-path', required=True, help='Path to PyBDSF source cat used to which will be used to .',
         dest='source_cat_path')
 parser.add_argument('-d','--start-dir', help='String that will replace the \/data\/mostertrij part of every in and output path.',
@@ -62,7 +62,7 @@ imfiles_correct = args['imfiles_correct']
 overwrite = args['overwrite']
 config_file = args['config_file']
 start_dir = args['start_dir']
-data_dir = args['data_dir']
+data_path = args['data_path']
 model_path = args['model_path']
 assuming_output_in_deg =True
 assert len(argv) > 1, "Insert path of configuration file when executing this script"
@@ -72,8 +72,8 @@ cfg.merge_from_file(config_file)
 source_cat_path = args['source_cat_path']
 
 print("Beginning of paths:", start_dir)
-data_dir = os.path.join(data_dir, 'LGZ_COCOstyle/annotations/')
-cfg.DATASET_PATH = data_dir.replace("/data/mostertrij",start_dir)
+data_path = os.path.join(data_path, 'LGZ_COCOstyle/annotations/')
+cfg.DATASET_PATH = data_path.replace("/data/mostertrij",start_dir)
 cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
 cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
 source_cat_path = source_cat_path.replace("/data/mostertrij",start_dir)
