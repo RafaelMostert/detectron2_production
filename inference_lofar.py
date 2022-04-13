@@ -37,17 +37,17 @@ random.seed(5455)
 assert len(argv) > 1, "Insert path of configuration file when executing this script"
 cfg = get_cfg()
 cfg.merge_from_file(argv[1])
-lotss_dr2_path = '/data/mostertrij/data/catalogues/LoTSS_DR2_v100.srl.h5'
 if len(argv) > 2:
     start_dir = argv[2]
+    model_path = argv[3]
+    PyBDSF_source_list_path = argv[4]
     print("Beginning of paths:", start_dir)
     cfg.DATASET_PATH = cfg.DATASET_PATH.replace("/data/mostertrij",start_dir)
     cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("/data/mostertrij",start_dir)
     cfg.DATASETS.IMAGE_DIR = cfg.DATASETS.IMAGE_DIR.replace("/data/mostertrij",start_dir)
-    lotss_dr2_path = lotss_dr2_path.replace("/data/mostertrij",start_dir)
-assert os.path.exists(lotss_dr2_path), lotss_dr2_path
+    PyBDSF_source_list_path = PyBDSF_source_list_path.replace("/data/mostertrij",start_dir)
+assert os.path.exists(PyBDSF_source_list_path), PyBDSF_source_list_path
 print(f"Loaded configuration file {argv[1]}")
-model_path = argv[3]
 print(f"Model path used for inference {model_path}")
 DATASET_PATH= cfg.DATASET_PATH
 print(f"Experiment: {cfg.EXPERIMENT_NAME}")
@@ -118,10 +118,6 @@ for i, dic in enumerate(random.sample(inference_dict, 3)):
 # this works for the after the fact test eval
 # for train eval those things are somewhere within a model 
 # specifically a model that takes data and retuns a dict of losses
-#pretrained_model_path = "/data/mostertrij/tridentnet/output/v4_all_withRot/model_0059999.pth".replace('/data/mostertrij',start_dir)
-#pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
-#pretrained_model_path = "/data/mostertrij/tridentnet/output/LB300_removed_withRot_constantLR_seed2/model_0119999.pth".replace('/data/mostertrij',start_dir)
-#pretrained_model_path = "/data/mostertrij/tridentnet/output/uLB300_precomputed_removed_withRot_constantLR_seed1/model_0009999.pth".replace('/data/mostertrij',start_dir)
 pretrained_model_path = model_path.replace('/data/mostertrij',start_dir)
 print("Load model:", pretrained_model_path)
 cfg.MODEL.WEIGHTS = os.path.join(pretrained_model_path)  # path to the model we just trained
@@ -251,7 +247,7 @@ comp_keys = ['Source_Name', 'RA', 'E_RA', 'DEC', 'E_DEC', 'Peak_flux',
        'Component_Name']
 
 # Read cats
-lotss_dr2_cat = pd.read_hdf(lotss_dr2_path)
+lotss_dr2_cat = pd.read_hdf(PyBDSF_source_list_path)
 predicted_comp_cat = pd.read_hdf(os.path.join(cfg.OUTPUT_DIR, 'bare_predicted_component_catalogue.h5'))
 
 # Get unique combined names

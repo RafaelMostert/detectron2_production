@@ -18,7 +18,7 @@ This work, and the Detectron2 on which it is build is released under the [Apache
 
 ## Citing this work
 
-If you use this work, you are using a derivative work of Detectron2, therefore please use the following BibTeX entry.
+If you use this work, you are using a derivative work of Detectron2, therefore please use the following BibTeX entries.
 
 ```BibTeX
 @article{Mostert2022
